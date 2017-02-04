@@ -1,0 +1,6 @@
+Name	Type	Level	Value
+beginningX	const	0	3
+facRes	var	0	4
+facParam	var	0	5
+Factorial	proc	0	1
+myFacParam	var	1	4
