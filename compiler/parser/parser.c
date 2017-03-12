@@ -90,7 +90,7 @@ bool Parser_parseProgram(Parser* self, AST_Program** program) {
 	
 	/* Consume "." token */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != periodsym) {
-		syntaxError("Expected \".\" at end of program block");
+		syntaxError("Expected \".\" at end of program block, not \"%s\"", tok->lexeme);
 		release(&prog);
 		return false;
 	}
@@ -164,7 +164,12 @@ static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls) {
 		
 		/* Consume "=" */
 		if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != eqsym) {
-			syntaxError("Expected \"=\" after name in constant declaration");
+			if(tok != NULL) {
+				syntaxError("Expected \"=\" after name in constant declaration, not \"%s\"", tok->lexeme);
+			}
+			else {
+				syntaxError("Unexpected EOF after name in constant declaration");
+			}
 			release(&consts);
 			return false;
 		}
@@ -712,7 +717,9 @@ static bool Parser_parseFactor(Parser* self, AST_Factor** factor) {
 			break;
 		
 		default:
-			abort();
+			syntaxError("Unexpected token \"%s\" while parsing factor", tok->lexeme);
+			release(&fact);
+			return false;
 	}
 	
 	*factor = fact;

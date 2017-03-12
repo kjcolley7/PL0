@@ -486,6 +486,9 @@ void AST_Term_drawGraph(AST_Term* self, Graphviz* gv) {
 
 Destroyer(AST_Factor) {
 	switch(self->type) {
+		case FACT_NULL:
+			break;
+		
 		case FACT_IDENT:
 			release(&self->value.ident);
 			break;

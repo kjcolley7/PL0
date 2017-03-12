@@ -76,6 +76,7 @@ enum COND_TYPE {
 };
 
 enum FACT_TYPE {
+	FACT_NULL = 0,
 	FACT_IDENT = 1,
 	FACT_NUMBER,
 	FACT_EXPR,
