@@ -174,7 +174,7 @@ int DebugEngine_run(DebugEngine* self) {
 	int err = 0;
 	char line[1024];
 	bool keepGoing = true;
-	const char* prompt = "(dbg) ";
+	const char* prompt = "\r(dbg) ";
 	
 	/* Initialize the program */
 	Machine_start(self->cpu);
