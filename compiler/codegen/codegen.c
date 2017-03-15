@@ -135,6 +135,11 @@ bool Codegen_genBlock(Block* scope, AST_Block* ast) {
 }
 
 static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement) {
+	/* Empty statement, so do nothing and return success */
+	if(!statement) {
+		return true;
+	}
+	
 	switch(statement->type) {
 		case STMT_ASSIGN:
 			/* Generate code to evaluate the expression */

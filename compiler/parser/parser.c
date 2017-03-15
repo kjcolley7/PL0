@@ -423,80 +423,24 @@ static bool Parser_parseParamDecls(Parser* self, AST_ParamDecls** param_decls) {
  */
 static bool Parser_parseStmt(Parser* self, AST_Stmt** statement) {
 	*statement = NULL;
-	AST_Stmt* stmt = NULL;
 	Token* tok;
 	
 	/* Make sure to handle EOF */
 	if(!TokenStream_peekToken(self->token_stream, &tok)) {
-		*statement = stmt;
 		return true;
 	}
 	
 	/* Invoke the parser function that corresponds to each branch of the alternation */
 	switch(tok->type) {
-		case identsym:
-			stmt->type = STMT_ASSIGN;
-			if(!Parser_parseStmtAssign(self, &stmt)) {
-				release(&stmt);
-				return false;
-			}
-			break;
-		
-		case callsym:
-			stmt->type = STMT_CALL;
-			if(!Parser_parseStmtCall(self, &stmt)) {
-				release(&stmt);
-				return false;
-			}
-			break;
-		
-		case beginsym:
-			stmt->type = STMT_BEGIN;
-			if(!Parser_parseStmtBegin(self, &stmt)) {
-				release(&stmt);
-				return false;
-			}
-			break;
-		
-		case ifsym:
-			stmt->type = STMT_IF;
-			if(!Parser_parseStmtIf(self, &stmt)) {
-				release(&stmt);
-				return false;
-			}
-			break;
-		
-		case whilesym:
-			stmt->type = STMT_WHILE;
-			if(!Parser_parseStmtWhile(self, &stmt)) {
-				release(&stmt);
-				return false;
-			}
-			break;
-		
-		case readsym:
-			stmt->type = STMT_READ;
-			if(!Parser_parseStmtRead(self, &stmt)) {
-				release(&stmt);
-				return false;
-			}
-			break;
-		
-		case writesym:
-			stmt->type = STMT_WRITE;
-			if(!Parser_parseStmtWrite(self, &stmt)) {
-				release(&stmt);
-				return false;
-			}
-			break;
-		
-		default:
-			/* NULL */
-			break;
+		case identsym: return Parser_parseStmtAssign(self, statement);
+		case callsym:  return Parser_parseStmtCall(self, statement);
+		case beginsym: return Parser_parseStmtBegin(self, statement);
+		case ifsym:    return Parser_parseStmtIf(self, statement);
+		case whilesym: return Parser_parseStmtWhile(self, statement);
+		case readsym:  return Parser_parseStmtRead(self, statement);
+		case writesym: return Parser_parseStmtWrite(self, statement);
+		default:       return true;
 	}
-	
-	*statement = stmt;
-	return true;
 }
 
 /*! Grammar:
@@ -604,26 +548,30 @@ static bool Parser_parseExpr(Parser* self, AST_Expr** expression) {
  */
 static bool Parser_parseRawExpr(Parser* self, AST_Expr** expression) {
 	*expression = NULL;
-	AST_Expr* expr = AST_Expr_new();
 	Token* tok;
+	AST_Expr* expr;
 	
 	/* Parse left term of the expression */
-	if(!Parser_parseTerm(self, &expr->values.binop.left)) {
-		release(&expr);
+	if(!Parser_parseTerm(self, &expr)) {
 		return false;
 	}
 	
 	/* Try to consume a plus or minus */
 	if(TokenStream_peekToken(self->token_stream, &tok)
 	   && (tok->type == plussym || tok->type == minussym)) {
-		expr->type = tok->type == plussym ? EXPR_ADD : EXPR_SUB;
+		/* Determine expression type */
+		EXPR_TYPE type = tok->type == plussym ? EXPR_ADD : EXPR_SUB;
 		TokenStream_consumeToken(self->token_stream);
 		
 		/* Parse right expression of the expression */
-		if(!Parser_parseRawExpr(self, &expr->values.binop.right)) {
+		AST_Expr* right;
+		if(!Parser_parseRawExpr(self, &right)) {
 			release(&expr);
 			return false;
 		}
+		
+		/* Build binary expression */
+		expr = AST_Expr_create(type, expr, right);
 	}
 	
 	*expression = expr;
@@ -648,6 +596,8 @@ static bool Parser_parseTerm(Parser* self, AST_Expr** term) {
 	/* Try to consume a multiplication or division operator token */
 	if(TokenStream_peekToken(self->token_stream, &tok)
 	   && (tok->type == multsym || tok->type == slashsym)) {
+		/* Determine expression type */
+		EXPR_TYPE type = tok->type == multsym ? EXPR_MUL : EXPR_DIV;
 		TokenStream_consumeToken(self->token_stream);
 		
 		/* Parse right side */
@@ -658,7 +608,7 @@ static bool Parser_parseTerm(Parser* self, AST_Expr** term) {
 		}
 		
 		/* Create binary operator expression */
-		trm = AST_Expr_create(tok->type == multsym ? EXPR_MUL : EXPR_DIV, trm, right);
+		trm = AST_Expr_create(type, trm, right);
 	}
 	
 	*term = trm;
@@ -927,7 +877,7 @@ static bool Parser_parseStmtCall(Parser* self, AST_Stmt** call_statement) {
 	*call_statement = NULL;
 	Token* tok;
 	char* ident;
-	AST_ParamList* param_list;
+	AST_ParamList* param_list = NULL;
 	
 	/* Consume "call" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != callsym) {

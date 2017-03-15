@@ -5,7 +5,8 @@ begin
 	if n > 0 then begin
 		return := n * call Factorial(n - 1);
 	end
-	else begin
+	;/*else begin*/
+	if n <= 0 then begin
 		return := 1;
 	end;
 end;

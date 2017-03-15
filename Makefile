@@ -7,9 +7,6 @@ override OFLAGS += -O2
 override LDFLAGS +=
 override YFLAGS += -Wall -Werror
 
-# Build with support for the Bison parser generator
-override CFLAGS += -DWITH_BISON=1
-
 
 # Directory where build products are stored
 BUILD := build
@@ -23,6 +20,15 @@ SRC_DIRS := lexer compiler compiler/parser compiler/codegen vm
 # All C source files
 SRCS := $(wildcard *.c) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.c))
 
+# Object files that need to be produced from C sources
+OBJS := $(patsubst %,$(BUILD)/%.o,$(SRCS))
+
+# Build with support for the Bison parser generator
+ifdef WITH_BISON
+
+# Set WITH_BISON macro for conditional compilation sections
+override CFLAGS += -DWITH_BISON=1
+
 # Bison parser generator input Y files
 BISON_FILES := $(wildcard compiler/parser/*.y)
 
@@ -31,8 +37,18 @@ BISON_C_FILES := $(patsubst %,$(GEN)/%.c,$(BISON_FILES))
 BISON_H_FILES := $(patsubst %,$(GEN)/%.h,$(BISON_FILES))
 BISON_OBJS := $(patsubst $(GEN)/%,$(BUILD)/%.o,$(BISON_C_FILES))
 
-# Object files that need to be produced from C sources
-OBJS := $(patsubst %,$(BUILD)/%.o,$(SRCS)) $(BISON_OBJS)
+# Append Bison object files
+OBJS := $(OBJS) $(BISON_OBJS)
+
+# Rule dependencies for all compilation rules
+PRE_CC := $(BISON_C_FILES) $(BISON_H_FILES)
+
+else #WITH_BISON
+
+# Empty
+PRE_CC :=
+
+endif #WITH_BISON
 
 # Dependency files that are produced during compilation
 DEPS := $(OBJS:.o=.d)
@@ -119,7 +135,7 @@ $(TARGET): $(OBJS)
 	$(_v)$(LD) $(LDFLAGS) -o $@ $^
 
 # Compiling rule
-$(BUILD)/%.o: % | $(BUILD_DIR_FILES) $(BISON_C_FILES) $(BISON_H_FILES)
+$(BUILD)/%.o: % | $(BUILD_DIR_FILES) $(PRE_CC)
 	@echo 'Compiling $<'
 	$(_v)$(CC) $(CFLAGS) $(OFLAGS) -I$(<D) -I$(GEN) -MD -MP -MF $(BUILD)/$*.d -c -o $@ $<
 
@@ -128,10 +144,15 @@ $(BUILD)/%.o: $(GEN)/% | $(BUILD_DIR_FILES)
 	@echo 'Compiling $<'
 	$(_v)$(CC) $(CFLAGS) $(OFLAGS) -I$(<D) -I$(GEN) -MD -MP -MF $(BUILD)/$*.d -c -o $@ $<
 
+
+ifdef WITH_BISON
 # Bison parser generation rule
 $(GEN)/%.c $(GEN)/%.h: % | $(BUILD_DIR_FILES)
 	@echo 'Bison $<'
 	$(_v)$(BISON) $(YFLAGS) --output=$(GEN)/$*.c --defines=$(GEN)/$*.h $<
+
+endif #WITH_BISON
+
 
 # Build dependency rules
 -include $(DEPS)

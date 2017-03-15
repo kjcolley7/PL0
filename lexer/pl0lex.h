@@ -9,6 +9,8 @@
 #ifndef PL0_PL0LEX_H
 #define PL0_PL0LEX_H
 
+#include <stdio.h>
+
 typedef struct LexerFiles LexerFiles;
 
 #include "object.h"
@@ -30,5 +32,10 @@ DECL(LexerFiles);
  @param files Open file streams used by the lexer
  */
 int run_lexer(LexerFiles* files);
+
+/*! Create a lexer object intended for scanning PL/0 source
+ @param fin Input file
+ */
+Lexer* PL0Lexer_initWithFile(Lexer* self, FILE* fin);
 
 #endif /* PL0_PL0LEX_H */

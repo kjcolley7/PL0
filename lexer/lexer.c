@@ -19,10 +19,10 @@ Destroyer(Lexer) {
 }
 DEF(Lexer);
 
-Lexer* Lexer_initWithStream(Lexer* self, FILE* stream) {
+Lexer* Lexer_initWithFile(Lexer* self, FILE* fin) {
 	if((self = Lexer_init(self))) {
 		self->line_number = 1;
-		self->stream = stream;
+		self->stream = fin;
 		self->fsm = State_new();
 		assert(self->fsm != NULL);
 	}

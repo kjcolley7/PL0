@@ -12,7 +12,8 @@ procedure main();
 			
 			if n <= 1 then
 				fibResult := n
-			else
+			;/* else */
+			if n > 1 then
 			begin
 				i := 2;
 				while i <= n do
@@ -33,7 +34,8 @@ procedure main();
 		c := h;
 		
 		if odd c then write ONE
-		else write ZERO;
+		;/* else write ZERO; */
+		if odd c + 1 then write ZERO;
 		
 		while h >= 0 do
 		begin

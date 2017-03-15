@@ -27,7 +27,8 @@ procedure Main();
 			/*{ Ensure we can use expressions as parameter values }*/
 			call WriteVolume(2 * L, W, H);
 		end
-		else begin
+		;/*else begin*/
+		if 2 * volume <= 2000 then begin
 			call WriteVolume(2000, 1, 1);
 		end;
 		

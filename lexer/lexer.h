@@ -55,9 +55,9 @@ DECL(Lexer);
 
 
 /*! Creates a lexer that scans tokens from the provided file stream
- @param stream Input file object that the lexer reads characters from
+ @param fin Input file object that the lexer reads characters from
  */
-Lexer* Lexer_initWithStream(Lexer* self, FILE* stream);
+Lexer* Lexer_initWithFile(Lexer* self, FILE* fin);
 
 /*! Get the state with the exact text as a prefix, creating it if necessary
  @param prefix Exact prefix that leads to the created state

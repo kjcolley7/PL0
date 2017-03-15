@@ -381,8 +381,11 @@ static void Stmt_Begin_drawGraph(AST_Stmt* self, Graphviz* gv) {
 	
 	size_t i;
 	for(i = 0; i < self->stmt.begin.stmt_count; i++) {
-		AST_Stmt_drawGraph(self->stmt.begin.stmts[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->stmt.begin.stmts[i]);
+		AST_Stmt* stmt = self->stmt.begin.stmts[i];
+		if(stmt != NULL) {
+			AST_Stmt_drawGraph(stmt, gv);
+			Graphviz_drawPtrEdge(gv, self, stmt);
+		}
 	}
 }
 
