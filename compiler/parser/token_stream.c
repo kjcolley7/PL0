@@ -126,13 +126,12 @@ int yylex(YYSTYPE* lvalp, TokenStream* scanner) {
 	if(!TokenStream_peekToken(scanner, &tok)) {
 		return -1;
 	}
-	TokenStream_consumeToken(scanner);
 	
 	/* Set lvalp if the token has an associated value */
+	int ret = tok->type;
 	switch(tok->type) {
 		case identsym:
-			/* XXX: Should this be strdup()ed? */
-			lvalp->ident = tok->lexeme;
+			lvalp->ident = strdup(tok->lexeme);
 			break;
 		
 		case numbersym:
@@ -141,12 +140,15 @@ int yylex(YYSTYPE* lvalp, TokenStream* scanner) {
 		
 		case nulsym:
 			/* EOF */
-			return 0;
+			ret = 0;
+			break;
 		
 		default:
 			break;
 	}
 	
-	return tok->type;
+	/* Release tok */
+	TokenStream_consumeToken(scanner);
+	return ret;
 }
 #endif /* WITH_BISON */
