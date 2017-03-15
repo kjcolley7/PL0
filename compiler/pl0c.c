@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include "parser/parser.h"
 #include "codegen/codegen.h"
+#include "ast_nodes.h"
+#include "ast_graph.h"
 
 
 Destroyer(CompilerFiles) {
@@ -29,10 +31,10 @@ int run_compiler(CompilerFiles* files) {
 	int err = EXIT_SUCCESS;
 	
 	/* Allocate and initialize PL/0 parser object */
-	Parser* parser = Parser_initWithStream(Parser_alloc(), files->tokenlist);
+	Parser* parser = Parser_initWithFile(Parser_alloc(), files->tokenlist);
 	
 	/* Parse program */
-	AST_Program* prog = NULL;
+	AST_Block* prog = NULL;
 	bool noSyntaxErrors = Parser_parseProgram(parser, &prog);
 	if(!noSyntaxErrors) {
 #if DEBUG
@@ -43,7 +45,7 @@ int run_compiler(CompilerFiles* files) {
 	else {
 		/* Parser completed without syntax errors, now output AST graph */
 		Graphviz* gv = Graphviz_initWithFile(Graphviz_alloc(), files->ast, "AST");
-		AST_Program_drawGraph(prog, gv);
+		AST_Block_drawGraph(prog, gv);
 		release(&gv);
 		
 		/* Generate code using the parsed AST of the program */

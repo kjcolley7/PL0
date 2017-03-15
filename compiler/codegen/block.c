@@ -36,7 +36,7 @@ bool Block_generate(Block* self, AST_Block* ast) {
 	for(i = 0; i < ast->procs->proc_count; i++) {
 		/* Generate the code for all subprocedures of this procedure */
 		AST_Proc* proc = ast->procs->procs[i];
-		Symbol* sym = SymTree_findSymbol(self->symtree, proc->ident->name);
+		Symbol* sym = SymTree_findSymbol(self->symtree, proc->ident);
 		if(!Block_generate(sym->value.procedure.body, proc->body)) {
 			return false;
 		}

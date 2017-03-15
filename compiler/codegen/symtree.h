@@ -19,6 +19,7 @@ typedef struct SymTree SymTree;
 #include "symbol.h"
 #include "config.h"
 #include "compiler/ast_nodes.h"
+#include "graphviz.h"
 
 struct SymTree {
 	OBJECT_BASE;

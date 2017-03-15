@@ -7,7 +7,9 @@
 //
 
 #include "token_stream.h"
+#include <stdlib.h>
 #include <string.h>
+#include "config.h"
 
 
 Destroyer(TokenStream) {
@@ -16,7 +18,7 @@ Destroyer(TokenStream) {
 }
 DEF(TokenStream);
 
-TokenStream* TokenStream_initWithStream(TokenStream* self, FILE* stream) {
+TokenStream* TokenStream_initWithFile(TokenStream* self, FILE* stream) {
 	if((self = TokenStream_init(self))) {
 		self->fin = stream;
 	}
@@ -115,4 +117,34 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 
 void TokenStream_consumeToken(TokenStream* self) {
 	release(&self->token);
+}
+
+int yylex(YYSTYPE* lvalp, TokenStream* scanner) {
+	/* Get next token */
+	Token* tok;
+	if(!TokenStream_peekToken(scanner, &tok)) {
+		return -1;
+	}
+	TokenStream_consumeToken(scanner);
+	
+	/* Set lvalp if the token has an associated value */
+	switch(tok->type) {
+		case identsym:
+			/* XXX: Should this be strdup()ed? */
+			lvalp->ident = tok->lexeme;
+			break;
+		
+		case numbersym:
+			lvalp->num = (Word)strtoul(tok->lexeme, NULL, 10);
+			break;
+		
+		case nulsym:
+			/* EOF */
+			return 0;
+		
+		default:
+			break;
+	}
+	
+	return tok->type;
 }

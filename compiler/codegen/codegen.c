@@ -13,20 +13,11 @@
 static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement);
 static bool genCond(Block* scope, BasicBlock** code, AST_Cond* condition);
 static bool genExpr(Block* scope, BasicBlock** code, AST_Expr* expression);
-static bool genTerm(Block* scope, BasicBlock** code, AST_Term* term);
-static bool genFactor(Block* scope, BasicBlock** code, AST_Factor* factor);
-static bool genNumber(Block* scope, BasicBlock** code, AST_Number* number);
-static bool genCall(Block* scope, BasicBlock** code, AST_Call* call);
+static bool genNumber(Block* scope, BasicBlock** code, Word number);
+static bool genCall(Block* scope, BasicBlock** code, char* ident, AST_ParamList* param_list);
 static bool genParamList(Block* scope, BasicBlock** code, AST_ParamList* param_list);
-static bool genStmtAssign(Block* scope, BasicBlock** code, Stmt_Assign* assign_statement);
-static bool genStmtCall(Block* scope, BasicBlock** code, Stmt_Call* call_statement);
-static bool genStmtBegin(Block* scope, BasicBlock** code, Stmt_Begin* begin_statement);
-static bool genStmtIf(Block* scope, BasicBlock** code, Stmt_If* if_statement);
-static bool genStmtWhile(Block* scope, BasicBlock** code, Stmt_While* while_statement);
-static bool genStmtRead(Block* scope, BasicBlock** code, Stmt_Read* read_statement);
-static bool genStmtWrite(Block* scope, BasicBlock** code, Stmt_Write* write_statement);
-static bool genLoadIdent(Block* scope, BasicBlock** code, AST_Ident* ident);
-static bool genStoreVar(Block* scope, BasicBlock** code, AST_Ident* ident);
+static bool genLoadIdent(Block* scope, BasicBlock** code, char* ident);
+static bool genStoreVar(Block* scope, BasicBlock** code, char* ident);
 
 
 static void vSemanticError(const char* fmt, va_list ap) {
@@ -48,10 +39,10 @@ Destroyer(Codegen) {
 }
 DEF(Codegen);
 
-Codegen* Codegen_initWithAST(Codegen* self, AST_Program* prog) {
+Codegen* Codegen_initWithAST(Codegen* self, AST_Block* prog) {
 	if((self = Codegen_init(self))) {
 		/* Build the symbol tree */
-		SymTree* scope = SymTree_initWithAST(SymTree_alloc(), NULL, prog->block, 0);
+		SymTree* scope = SymTree_initWithAST(SymTree_alloc(), NULL, prog, 0);
 		if(scope == NULL) {
 			/* Codegen error occurred, so destroy self and return NULL */
 			release(&self);
@@ -67,7 +58,7 @@ Codegen* Codegen_initWithAST(Codegen* self, AST_Program* prog) {
 		}
 		
 		/* Generate code for the block */
-		if(!Block_generate(self->block, prog->block)) {
+		if(!Block_generate(self->block, prog)) {
 			/* Codegen error occurred, so destroy self and return NULL */
 			release(&self);
 			return NULL;
@@ -145,15 +136,113 @@ bool Codegen_genBlock(Block* scope, AST_Block* ast) {
 
 static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement) {
 	switch(statement->type) {
-		case STMT_ASSIGN: return genStmtAssign(scope, code, statement->stmt.assign);
-		case STMT_CALL:   return genStmtCall(scope, code, statement->stmt.call);
-		case STMT_BEGIN:  return genStmtBegin(scope, code, statement->stmt.begin);
-		case STMT_IF:     return genStmtIf(scope, code, statement->stmt.if_stmt);
-		case STMT_WHILE:  return genStmtWhile(scope, code, statement->stmt.while_stmt);
-		case STMT_READ:   return genStmtRead(scope, code, statement->stmt.read);
-		case STMT_WRITE:  return genStmtWrite(scope, code, statement->stmt.write);
-		case STMT_EMPTY:  return true;
-		default: abort();
+		case STMT_ASSIGN:
+			/* Generate code to evaluate the expression */
+			if(!genExpr(scope, code, statement->stmt.assign.value)) {
+				return false;
+			}
+			
+			/* Generate code to store the evaluation result in the variable */
+			return genStoreVar(scope, code, statement->stmt.assign.ident);
+		
+		case STMT_CALL:
+			/* Generate a call but don't increment the stack afterwards (ignore return value) */
+			return genCall(scope, code, statement->stmt.call.ident, statement->stmt.call.param_list);
+		
+		case STMT_BEGIN: {
+			size_t i;
+			for(i = 0; i < statement->stmt.begin.stmt_count; i++) {
+				/* Generate the code for each statement */
+				if(!genStmt(scope, code, statement->stmt.begin.stmts[i])) {
+					return false;
+				}
+			}
+			return true;
+		}
+		
+		case STMT_IF: {
+			/* Generate the code to compute the condition */
+			if(!genCond(scope, code, statement->stmt.if_stmt.cond)) {
+				return false;
+			}
+			
+			/* Remember the basic block for the condition */
+			BasicBlock* cond = *code;
+			
+			/* Create an empty basic block to hold the code when the condition is true */
+			BasicBlock* true_branch_begin = BasicBlock_createNext(code);
+			BasicBlock_setTarget(cond, true_branch_begin);
+			
+			/* Generate code for the then statement of the if statement */
+			if(!genStmt(scope, code, statement->stmt.if_stmt.body)) {
+				return false;
+			}
+			
+			/* Remember the last basic block of the true branch */
+			BasicBlock* true_branch_end = *code;
+			
+			/* Create an empty basic block to hold the code when the condition is false */
+			BasicBlock* false_branch_begin = BasicBlock_createNext(code);
+			BasicBlock_setFalseTarget(cond, false_branch_begin);
+			
+			/* There is no else statement, so make the code from the true branch rejoin the false branch */
+			BasicBlock_setTarget(true_branch_end, false_branch_begin);
+			return true;
+		}
+		
+		case STMT_WHILE: {
+			/* Remember the basic block just before the condition to link it */
+			BasicBlock* before_cond = *code;
+			
+			/* Create a new basic block for the condition */
+			BasicBlock* cond = BasicBlock_createNext(code);
+			BasicBlock_setTarget(before_cond, cond);
+			
+			/* Generate code for the condition of the while statement */
+			if(!genCond(scope, code, statement->stmt.while_stmt.cond)) {
+				return false;
+			}
+			
+			/* Create a new basic block for the loop body */
+			BasicBlock* loop_body_begin = BasicBlock_createNext(code);
+			BasicBlock_setTarget(cond, loop_body_begin);
+			
+			/* Generate code for the body of the while statement */
+			if(!genStmt(scope, code, statement->stmt.while_stmt.body)) {
+				return false;
+			}
+			
+			/* Remember the end of the loop body */
+			BasicBlock* loop_body_end = *code;
+			
+			/* Connect the end of the loop body to the condition */
+			BasicBlock_setTarget(loop_body_end, cond);
+			
+			/* Create an empty basic block to go to when the while condition is false */
+			BasicBlock* endwhile = BasicBlock_createNext(code);
+			BasicBlock_setFalseTarget(cond, endwhile);
+			return true;
+		}
+	
+		case STMT_READ:
+			/* Generate code to read a value to the top of the stack */
+			BasicBlock_addInsn(*code, MAKE_READ());
+			
+			/* Generate code to store the value that was read on top of the stack into the variable */
+			return genStoreVar(scope, code, statement->stmt.read.ident);
+		
+		case STMT_WRITE:
+			/* Generate code to load the value of an identifier to the top of the stack */
+			if(!genLoadIdent(scope, code, statement->stmt.write.ident)) {
+				return false;
+			}
+			
+			/* Generate code to write out the value of the variable */
+			BasicBlock_addInsn(*code, MAKE_WRITE());
+			return true;
+		
+		default:
+			abort();
 	}
 }
 
@@ -161,135 +250,121 @@ static bool genCond(Block* scope, BasicBlock** code, AST_Cond* condition) {
 	/* Store the start of the condition in the basic block for optimizations later */
 	BasicBlock_markCondition(*code);
 	
+	/* Get instruction type for the condition */
+	Insn cond_insn;
+	switch(condition->type) {
+		/* For unary operators, generate the code now */
+		case COND_ODD:
+			if(!genExpr(scope, code, condition->values.operand)) {
+				return false;
+			}
+			BasicBlock_addInsn(*code, MAKE_ODD());
+			return true;
+		
+		/* For binary operators, just select the comparison instruction */
+		case COND_EQ: cond_insn = MAKE_EQL(); break;
+		case COND_NE: cond_insn = MAKE_NEQ(); break;
+		case COND_LT: cond_insn = MAKE_LSS(); break;
+		case COND_LE: cond_insn = MAKE_LEQ(); break;
+		case COND_GT: cond_insn = MAKE_GTR(); break;
+		case COND_GE: cond_insn = MAKE_GEQ(); break;
+		
+		default:
+			abort();
+	}
+	
 	/* Create code for the first operand of the conditional operator */
-	bool success = genExpr(scope, code, condition->left);
-	if(!success) {
+	if(!genExpr(scope, code, condition->values.binop.left)) {
 		return false;
 	}
 	
-	/* The odd condition only has one operand */
-	if(condition->type == COND_ODD) {
-		BasicBlock_addInsn(*code, MAKE_ODD());
-		return true;
-	}
-	
 	/* All other conditions have a second operand */
-	success = genExpr(scope, code, condition->right);
-	if(!success) {
+	if(!genExpr(scope, code, condition->values.binop.right)) {
 		return false;
 	}
 	
 	/* Output the comparison instruction */
-	switch(condition->type) {
-		case COND_EQ:  BasicBlock_addInsn(*code, MAKE_EQL()); break;
-		case COND_NEQ: BasicBlock_addInsn(*code, MAKE_NEQ()); break;
-		case COND_LT:  BasicBlock_addInsn(*code, MAKE_LSS()); break;
-		case COND_LE:  BasicBlock_addInsn(*code, MAKE_LEQ()); break;
-		case COND_GT:  BasicBlock_addInsn(*code, MAKE_GTR()); break;
-		case COND_GE:  BasicBlock_addInsn(*code, MAKE_GEQ()); break;
-		default: abort();
-	}
-	
+	BasicBlock_addInsn(*code, cond_insn);
 	return true;
 }
 
 static bool genExpr(Block* scope, BasicBlock** code, AST_Expr* expression) {
-	/* Generate code to produce the left operand of the expression */
-	bool success = genTerm(scope, code, expression->left);
-	if(!success) {
+	Insn expr_insn;
+	switch(expression->type) {
+		case EXPR_VAR:
+			return genLoadIdent(scope, code, expression->values.ident);
+		
+		case EXPR_NUM:
+			return genNumber(scope, code, expression->values.num);
+		
+		case EXPR_NEG:
+			if(!genExpr(scope, code, expression->values.operand)) {
+				return false;
+			}
+			BasicBlock_addInsn(*code, MAKE_NEG());
+			return true;
+		
+		case EXPR_ADD: expr_insn = MAKE_ADD(); break;
+		case EXPR_SUB: expr_insn = MAKE_SUB(); break;
+		case EXPR_MUL: expr_insn = MAKE_MUL(); break;
+		case EXPR_DIV: expr_insn = MAKE_DIV(); break;
+		
+		case EXPR_CALL:
+			if(!genCall(scope, code, expression->values.call.ident, expression->values.call.param_list)) {
+				return false;
+			}
+			
+			/* Adjust the stack pointer by one so the procedure's result is on the stack */
+			BasicBlock_addInsn(*code, MAKE_INC(1));
+			return true;
+		
+		default:
+			abort();
+	}
+	
+	/* Only binary operators execute this code */
+	
+	/* Generate left operand */
+	if(!genExpr(scope, code, expression->values.binop.left)) {
 		return false;
 	}
 	
-	/* Left operand can optionally be negated */
-	if(expression->a_negative) {
-		BasicBlock_addInsn(*code, MAKE_NEG());
-	}
-	
-	/* Right operand is optional */
-	if(expression->right != NULL) {
-		/* Generate code to produce the right operand of the expression */
-		success = genExpr(scope, code, expression->right);
-		if(!success) {
-			return false;
-		}
-		
-		/* Create subtraction or addition instruction */
-		if(expression->subtract) {
-			BasicBlock_addInsn(*code, MAKE_SUB());
-		}
-		else {
-			BasicBlock_addInsn(*code, MAKE_ADD());
-		}
-	}
-	
-	return true;
-}
-
-static bool genTerm(Block* scope, BasicBlock** code, AST_Term* term) {
-	/* Generate code to produce the left operand of the term */
-	bool success = genFactor(scope, code, term->left);
-	if(!success) {
+	/* Generate right operand */
+	if(!genExpr(scope, code, expression->values.binop.right)) {
 		return false;
 	}
 	
-	/* Right operand is optional */
-	if(term->right != NULL) {
-		/* Generate code to produce the right operand of the term */
-		success = genTerm(scope, code, term->right);
-		if(!success) {
-			return false;
-		}
-		
-		/* Create division or multiplication instruction */
-		if(term->divide) {
-			BasicBlock_addInsn(*code, MAKE_DIV());
-		}
-		else {
-			BasicBlock_addInsn(*code, MAKE_MUL());
-		}
-	}
-	
+	/* Add binary operator instruction */
+	BasicBlock_addInsn(*code, expr_insn);
 	return true;
 }
 
-static bool genFactor(Block* scope, BasicBlock** code, AST_Factor* factor) {
-	/* Generate code to produce the factor's value based on its type */
-	switch(factor->type) {
-		case FACT_NUMBER: return genNumber(scope, code, factor->value.number);
-		case FACT_IDENT:  return genLoadIdent(scope, code, factor->value.ident);
-		case FACT_EXPR:   return genExpr(scope, code, factor->value.expr);
-		case FACT_CALL:   return genCall(scope, code, factor->value.call);
-		default: abort();
-	}
-}
-
-static bool genNumber(Block* scope, BasicBlock** code, AST_Number* number) {
+static bool genNumber(Block* scope, BasicBlock** code, Word number) {
 	/* The scope variable is not necessary, so it is ignored */
 	(void)scope;
-	BasicBlock_addInsn(*code, MAKE_LIT(number->num));
+	BasicBlock_addInsn(*code, MAKE_LIT(number));
 	return true;
 }
 
-static bool genCall(Block* scope, BasicBlock** code, AST_Call* call) {
+static bool genCall(Block* scope, BasicBlock** code, char* ident, AST_ParamList* param_list) {
 	/* Lookup the procedure symbol by name */
-	const char* name = call->ident->name;
-	Symbol* sym = SymTree_findSymbol(scope->symtree, name);
+	Symbol* sym = SymTree_findSymbol(scope->symtree, ident);
 	if(sym == NULL) {
-		semanticError("Tried to call procedure \"%s\" which isn't declared at this scope", name);
+		semanticError("Tried to call procedure \"%s\" which isn't declared at this scope", ident);
 		return false;
 	}
 	
-	/* Generate code to evaluate the parameters and place them where they need to be */
-	genParamList(scope, code, call->param_list);
+	/* Are there parameters given? */
+	if(param_list != NULL) {
+		/* Generate code to evaluate the parameters and place them where they need to be */
+		genParamList(scope, code, param_list);
+	}
 	
 	/* Remember to resolve this reference later */
 	BasicBlock_markSymbol(*code, sym);
 	
 	/* Generate the call instruction (target will be set during symbol resolution) */
 	BasicBlock_addInsn(*code, MAKE_CAL(0, ADDR_UND));
-	
-	/* Adjust the stack pointer by one so the procedure's result is on the stack */
-	BasicBlock_addInsn(*code, MAKE_INC(1));
 	return true;
 }
 
@@ -305,9 +380,8 @@ static bool genParamList(Block* scope, BasicBlock** code, AST_ParamList* param_l
 	/* Generate the code to produce the value of all parameters */
 	size_t i;
 	for(i = 0; i < param_list->param_count; i++) {
-		bool success = genExpr(scope, code, param_list->params[i]);
-		if(!success) {
-			return success;
+		if(!genExpr(scope, code, param_list->params[i])) {
+			return false;
 		}
 	}
 	
@@ -316,165 +390,11 @@ static bool genParamList(Block* scope, BasicBlock** code, AST_ParamList* param_l
 	return true;
 }
 
-static bool genStmtAssign(Block* scope, BasicBlock** code, Stmt_Assign* assign_statement) {
-	/* Generate code to produce the value to store into the variable */
-	bool success = genExpr(scope, code, assign_statement->value);
-	if(!success) {
-		return false;
-	}
-	
-	/* Generate code to store the expression result into the variable */
-	return genStoreVar(scope, code, assign_statement->ident);
-}
-
-static bool genStmtCall(Block* scope, BasicBlock** code, Stmt_Call* call_statement) {
-	/* Lookup the procedure symbol by name */
-	const char* name = call_statement->ident->name;
-	Symbol* sym = SymTree_findSymbol(scope->symtree, name);
-	if(sym == NULL) {
-		semanticError("Tried to call procedure \"%s\" which isn't declared at this scope", name);
-		return false;
-	}
-	
-	/* Are there parameters given? */
-	if(call_statement->param_list != NULL) {
-		/* Generate code to evaluate the parameters and place them where they need to be */
-		genParamList(scope, code, call_statement->param_list);
-	}
-	
-	/* Remember to resolve this reference later */
-	BasicBlock_markSymbol(*code, sym);
-	
-	/* Generate the call instruction (target will be set during symbol resolution) */
-	BasicBlock_addInsn(*code, MAKE_CAL(0, ADDR_UND));
-	return true;
-}
-
-static bool genStmtBegin(Block* scope, BasicBlock** code, Stmt_Begin* begin_statement) {
-	size_t i;
-	for(i = 0; i < begin_statement->stmt_count; i++) {
-		/* Generate the code for each statement */
-		bool success = genStmt(scope, code, begin_statement->stmts[i]);
-		if(!success) {
-			return false;
-		}
-	}
-	
-	return true;
-}
-
-static bool genStmtIf(Block* scope, BasicBlock** code, Stmt_If* if_statement) {
-	/* Generate the code to compute the condition */
-	bool success = genCond(scope, code, if_statement->cond);
-	if(!success) {
-		return false;
-	}
-	
-	/* Remember the basic block for the condition */
-	BasicBlock* cond = *code;
-	
-	/* Create an empty basic block to hold the code when the condition is true */
-	BasicBlock* true_branch_begin = BasicBlock_createNext(code);
-	BasicBlock_setTarget(cond, true_branch_begin);
-	
-	/* Generate code for the then statement of the if statement */
-	success = genStmt(scope, code, if_statement->then_stmt);
-	if(!success) {
-		return false;
-	}
-	
-	/* Remember the last basic block of the true branch */
-	BasicBlock* true_branch_end = *code;
-	
-	/* Create an empty basic block to hold the code when the condition is false */
-	BasicBlock* false_branch_begin = BasicBlock_createNext(code);
-	BasicBlock_setFalseTarget(cond, false_branch_begin);
-	
-	/* Does this if statement have an else branch to it? */
-	if(if_statement->else_stmt == NULL) {
-		/* There is no else statement, so make the code from the true branch rejoin the false branch */
-		BasicBlock_setTarget(true_branch_end, false_branch_begin);
-	}
-	else {
-		/* Generate code for the else statement of the if statement */
-		success = genStmt(scope, code, if_statement->else_stmt);
-		if(!success) {
-			return false;
-		}
-		
-		/* Remember the end of the false branch */
-		BasicBlock* false_branch_end = *code;
-		
-		/* Create an empty basic block for both branches to rejoin into */
-		BasicBlock* endif = BasicBlock_createNext(code);
-		BasicBlock_setTarget(true_branch_end, endif);
-		BasicBlock_setTarget(false_branch_end, endif);
-	}
-	
-	return true;
-}
-
-static bool genStmtWhile(Block* scope, BasicBlock** code, Stmt_While* while_statement) {
-	BasicBlock* before_cond = *code;
-	
-	/* Create a new basic block for the condition */
-	BasicBlock* cond = BasicBlock_createNext(code);
-	BasicBlock_setTarget(before_cond, cond);
-	
-	/* Generate code for the condition of the while statement */
-	bool success = genCond(scope, code, while_statement->cond);
-	if(!success) {
-		return false;
-	}
-	
-	/* Create a new basic block for the loop body */
-	BasicBlock* loop_body_begin = BasicBlock_createNext(code);
-	BasicBlock_setTarget(cond, loop_body_begin);
-	
-	/* Generate code for the body of the while statement */
-	success = genStmt(scope, code, while_statement->do_stmt);
-	if(!success) {
-		return false;
-	}
-	
-	/* Remember the end of the loop body */
-	BasicBlock* loop_body_end = *code;
-	
-	/* Connect the end of the loop body to the condition */
-	BasicBlock_setTarget(loop_body_end, cond);
-	
-	/* Create an empty basic block to go to when the while condition is false */
-	BasicBlock* endwhile = BasicBlock_createNext(code);
-	BasicBlock_setFalseTarget(cond, endwhile);
-	return true;
-}
-
-static bool genStmtRead(Block* scope, BasicBlock** code, Stmt_Read* read_statement) {
-	/* Generate code to read a value to the top of the stack */
-	BasicBlock_addInsn(*code, MAKE_READ());
-	
-	/* Generate code to store the value that was read on top of the stack into the variable */
-	return genStoreVar(scope, code, read_statement->ident);
-}
-
-static bool genStmtWrite(Block* scope, BasicBlock** code, Stmt_Write* write_statement) {
-	/* Generate code to load the value of an identifier to the top of the stack */
-	bool success = genLoadIdent(scope, code, write_statement->ident);
-	if(!success) {
-		return false;
-	}
-	
-	/* Generate code to write out the value of the variable */
-	BasicBlock_addInsn(*code, MAKE_WRITE());
-	return true;
-}
-
-static bool genLoadIdent(Block* scope, BasicBlock** code, AST_Ident* ident) {
+static bool genLoadIdent(Block* scope, BasicBlock** code, char* ident) {
 	/* Lookup the symbol by its name */
-	const char* name = ident->name;
-	Symbol* sym = SymTree_findSymbol(scope->symtree, name);
+	Symbol* sym = SymTree_findSymbol(scope->symtree, ident);
 	if(sym == NULL) {
-		semanticError("Symbol \"%s\" used but not declared", name);
+		semanticError("Symbol \"%s\" used but not declared", ident);
 		return false;
 	}
 	
@@ -485,7 +405,7 @@ static bool genLoadIdent(Block* scope, BasicBlock** code, AST_Ident* ident) {
 	switch(sym->type) {
 		case SYM_PROC:
 			/* Can't use a procedure here */
-			semanticError("Symbol \"%s\" was used like a variable but is a procedure", name);
+			semanticError("Symbol \"%s\" was used like a variable but is a procedure", ident);
 			return false;
 			
 		case SYM_CONST:
@@ -504,12 +424,11 @@ static bool genLoadIdent(Block* scope, BasicBlock** code, AST_Ident* ident) {
 	}
 }
 
-static bool genStoreVar(Block* scope, BasicBlock** code, AST_Ident* ident) {
+static bool genStoreVar(Block* scope, BasicBlock** code, char* ident) {
 	/* Lookup the symbol for the variable in the assignment */
-	const char* name = ident->name;
-	Symbol* sym = SymTree_findSymbol(scope->symtree, name);
+	Symbol* sym = SymTree_findSymbol(scope->symtree, ident);
 	if(sym == NULL) {
-		semanticError("Tried to modify variable \"%s\" before it was declared", name);
+		semanticError("Tried to modify variable \"%s\" before it was declared", ident);
 		return false;
 	}
 	
@@ -519,11 +438,11 @@ static bool genStoreVar(Block* scope, BasicBlock** code, AST_Ident* ident) {
 	/* Only variables are allowed, but handle each type for better error messages */
 	switch(sym->type) {
 		case SYM_CONST:
-			semanticError("Tried to modify \"%s\", but it is a constant", name);
+			semanticError("Tried to modify \"%s\", but it is a constant", ident);
 			return false;
 			
 		case SYM_PROC:
-			semanticError("Tried to modify \"%s\", but it is a procedure", name);
+			semanticError("Tried to modify \"%s\", but it is a procedure", ident);
 			return false;
 			
 		case SYM_VAR: {

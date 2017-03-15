@@ -15,27 +15,6 @@
 #include <assert.h>
 
 
-Destroyer(AST_Program) {
-	release(&self->block);
-}
-DEF(AST_Program);
-
-/*! Example:
- 
- @code
-   +-------+
-   |program|
-   +-------+
-       |
-     block
- @endcode
- */
-void AST_Program_drawGraph(AST_Program* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<i>program</i>");
-	AST_Block_drawGraph(self->block, gv);
-	Graphviz_drawPtrEdge(gv, self, self->block);
-}
-
 Destroyer(AST_Block) {
 	release(&self->consts);
 	release(&self->vars);
@@ -44,44 +23,10 @@ Destroyer(AST_Block) {
 }
 DEF(AST_Block);
 
-/*! Example:
- 
- @code
-          +-----+
-          |block|
-          +-----+
-    _____/ /  \ \_____
-   /      /    \      \
- consts vars  procs  stmt
- @endcode
- */
-void AST_Block_drawGraph(AST_Block* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<i>block</i>");
-	
-	if(self->consts != NULL) {
-		AST_ConstDecls_drawGraph(self->consts, gv);
-		Graphviz_drawPtrEdge(gv, self, self->consts);
-	}
-	
-	if(self->vars != NULL) {
-		AST_VarDecls_drawGraph(self->vars, gv);
-		Graphviz_drawPtrEdge(gv, self, self->vars);
-	}
-	
-	if(self->procs != NULL && self->procs->proc_count > 0) {
-		AST_ProcDecls_drawGraph(self->procs, gv);
-		Graphviz_drawPtrEdge(gv, self, self->procs);
-	}
-	
-	AST_Stmt_drawGraph(self->stmt, gv);
-	Graphviz_drawPtrEdge(gv, self, self->stmt);
-}
-
 Destroyer(AST_ConstDecls) {
 	size_t i;
 	for(i = 0; i < self->const_count; i++) {
-		release(&self->idents[i]);
-		release(&self->values[i]);
+		destroy(&self->idents[i]);
 	}
 	
 	destroy(&self->idents);
@@ -89,96 +34,25 @@ Destroyer(AST_ConstDecls) {
 }
 DEF(AST_ConstDecls);
 
-/*! Example: const a = 4, b = 9, c = 0;
-
- @code
-    +-----------+
-    |const-decls|
-    +-----------+
-    /     |     \
-   =      =      =
-  / \    / \    / \
- a   4  b   9  c   0
- @endcode
- */
-void AST_ConstDecls_drawGraph(AST_ConstDecls* self, Graphviz* gv) {
-	char* node_id = ptos(self);
-	Graphviz_drawNode(gv, node_id, "<i>const-decls</i>");
-	
-	size_t i;
-	for(i = 0; i < self->const_count; i++) {
-		char* const_id;
-		asprintf_ff(&const_id, "%p[%zu]", self, i);
-		
-		Graphviz_drawNode(gv, const_id, "=");
-		Graphviz_drawEdge(gv, node_id, const_id);
-		
-		char* name_id = ptos(self->idents[i]);
-		AST_Ident_drawGraph(self->idents[i], gv);
-		
-		Graphviz_drawEdge(gv, const_id, name_id);
-		destroy(&name_id);
-		
-		char* value_id = ptos(self->values[i]);
-		AST_Number_drawGraph(self->values[i], gv);
-		
-		Graphviz_drawEdge(gv, const_id, value_id);
-		destroy(&value_id);
-		destroy(&const_id);
-	}
-	
-	destroy(&node_id);
-}
-
 Destroyer(AST_ParamDecls) {
 	size_t i;
 	for(i = 0; i < self->param_count;i++) {
-		release(&self->params[i]);
+		destroy(&self->params[i]);
 	}
 	
 	destroy(&self->params);
 }
 DEF(AST_ParamDecls);
 
-void AST_ParamDecls_drawGraph(AST_ParamDecls* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<i>parameter-block</i>");
-	
-	size_t i;
-	for(i = 0; i < self->param_count; i++) {
-		AST_Ident_drawGraph(self->params[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->params[i]);
-	}
-}
-
 Destroyer(AST_VarDecls) {
 	size_t i;
 	for(i = 0; i < self->var_count; i++) {
-		release(&self->vars[i]);
+		destroy(&self->vars[i]);
 	}
 	
 	destroy(&self->vars);
 }
 DEF(AST_VarDecls);
-
-/*! Example: var x, y;
- 
- @code
-  +---------+
-  |var-decls|
-  +---------+
-     /   \
-    x     y
- @endcode
- */
-void AST_VarDecls_drawGraph(AST_VarDecls* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<i>var-decls</i>");
-	
-	size_t i;
-	for(i = 0; i < self->var_count; i++) {
-		AST_Ident_drawGraph(self->vars[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->vars[i]);
-	}
-}
 
 Destroyer(AST_ProcDecls) {
 	size_t i;
@@ -190,91 +64,52 @@ Destroyer(AST_ProcDecls) {
 }
 DEF(AST_ProcDecls);
 
-/*! Example:
- 
- procedure A;;
- procedure B;;
- 
- @code
-   +----------+
-   |proc-decls|
-   +----------+
-     /     \
-    A       B
- @endcode
- */
-void AST_ProcDecls_drawGraph(AST_ProcDecls* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<i>proc-decls</i>");
-	
-	size_t i;
-	for(i = 0; i < self->proc_count; i++) {
-		AST_Proc_drawGraph(self->procs[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->procs[i]);
-	}
-}
-
 Destroyer(AST_Proc) {
-	release(&self->ident);
+	destroy(&self->ident);
 	release(&self->body);
 }
 DEF(AST_Proc);
 
-/*! Example:
- 
- @code
- procedure A;
- block...;
- @endcode
- 
- @code
-   +---------+
-   |procedure|
-   +---------+
-     /    \
-    A    block
- @endcode
- */
-void AST_Proc_drawGraph(AST_Proc* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<i>procedure</i>");
-	AST_Ident_drawGraph(self->ident, gv);
-	Graphviz_drawPtrEdge(gv, self, self->ident);
-	AST_ParamDecls_drawGraph(self->param_decls, gv);
-	Graphviz_drawPtrEdge(gv, self, self->param_decls);
-	AST_Block_drawGraph(self->body, gv);
-	Graphviz_drawPtrEdge(gv, self, self->body);
-}
-
 Destroyer(AST_Stmt) {
 	switch(self->type) {
+		case STMT_UNINITIALIZED:
+			break;
+		
 		case STMT_ASSIGN:
-			release(&self->stmt.assign);
+			destroy(&self->stmt.assign.ident);
+			release(&self->stmt.assign.value);
 			break;
 		
 		case STMT_CALL:
-			release(&self->stmt.call);
+			destroy(&self->stmt.call.ident);
+			release(&self->stmt.call.param_list);
 			break;
 		
-		case STMT_BEGIN:
-			release(&self->stmt.begin);
+		case STMT_BEGIN: {
+			size_t i;
+			for(i = 0; i < self->stmt.begin.stmt_count; i++) {
+				release(&self->stmt.begin.stmts[i]);
+			}
+			destroy(&self->stmt.begin.stmts);
 			break;
+		}
 		
 		case STMT_IF:
-			release(&self->stmt.if_stmt);
+			release(&self->stmt.if_stmt.cond);
+			release(&self->stmt.if_stmt.body);
 			break;
 		
 		case STMT_WHILE:
-			release(&self->stmt.while_stmt);
+			release(&self->stmt.while_stmt.cond);
+			release(&self->stmt.while_stmt.body);
 			break;
 		
 		case STMT_READ:
-			release(&self->stmt.read);
+			destroy(&self->stmt.read.ident);
 			break;
 		
 		case STMT_WRITE:
-			release(&self->stmt.write);
-			break;
-		
-		case STMT_EMPTY:
+			destroy(&self->stmt.write.ident);
 			break;
 		
 		default:
@@ -283,294 +118,65 @@ Destroyer(AST_Stmt) {
 }
 DEF(AST_Stmt);
 
-void AST_Stmt_drawGraph(AST_Stmt* self, Graphviz* gv) {
-	if(self->type == STMT_EMPTY) {
-		/* Draw empty statements in red to be more easily seen */
-		Graphviz_drawPtrNode(gv, self, "<font color=\"red\"><i>statement</i></font>");
-		return;
-	}
-	
-	Graphviz_drawPtrNode(gv, self, "<i>statement</i>");
-	
-	/* Draw the actual statement nodes and then add an edge to the subtree */
-	switch(self->type) {
-		case STMT_ASSIGN:
-			Stmt_Assign_drawGraph(self->stmt.assign, gv);
-			Graphviz_drawPtrEdge(gv, self, self->stmt.assign);
-			break;
-			
-		case STMT_CALL:
-			Stmt_Call_drawGraph(self->stmt.call, gv);
-			Graphviz_drawPtrEdge(gv, self, self->stmt.call);
-			break;
-			
-		case STMT_BEGIN:
-			Stmt_Begin_drawGraph(self->stmt.begin, gv);
-			Graphviz_drawPtrEdge(gv, self, self->stmt.begin);
-			break;
-			
-		case STMT_IF:
-			Stmt_If_drawGraph(self->stmt.if_stmt, gv);
-			Graphviz_drawPtrEdge(gv, self, self->stmt.if_stmt);
-			break;
-			
-		case STMT_WHILE:
-			Stmt_While_drawGraph(self->stmt.while_stmt, gv);
-			Graphviz_drawPtrEdge(gv, self, self->stmt.while_stmt);
-			break;
-			
-		case STMT_READ:
-			Stmt_Read_drawGraph(self->stmt.read, gv);
-			Graphviz_drawPtrEdge(gv, self, self->stmt.read);
-			break;
-			
-		case STMT_WRITE:
-			Stmt_Write_drawGraph(self->stmt.write, gv);
-			Graphviz_drawPtrEdge(gv, self, self->stmt.write);
-			break;
-			
-		default:
-			abort();
-	}
-}
-
 Destroyer(AST_Cond) {
-	release(&self->left);
-	release(&self->right);
+	switch(self->type) {
+		case COND_UNINITIALIZED:
+			break;
+		
+		case COND_ODD:
+			release(&self->values.operand);
+			break;
+		
+		case COND_EQ:
+		case COND_NE:
+		case COND_LT:
+		case COND_LE:
+		case COND_GT:
+		case COND_GE:
+			release(&self->values.binop.left);
+			release(&self->values.binop.right);
+			break;
+		
+		default:
+			assert(false);
+	}
 }
 DEF(AST_Cond);
 
-/*! Example: a < b + 4
- 
- @code
-   +---------+
-   |condition|
-   +---------+
-        |
-        <
-       / \
-      a   +
-         / \
-        b   4
- @endcode
- */
-void AST_Cond_drawGraph(AST_Cond* self, Graphviz* gv) {
-	char* node_id = ptos(self);
-	Graphviz_drawNode(gv, node_id, "<i>condition</i>");
-	
-	const char* op_str = NULL;
-	switch(self->type) {
-		case COND_ODD: op_str = "odd"; break;
-		case COND_EQ:  op_str = "=";   break;
-		case COND_GE:  op_str = "&gt;=";  break;
-		case COND_GT:  op_str = "&gt;";   break;
-		case COND_LE:  op_str = "&lt;=";  break;
-		case COND_LT:  op_str = "&lt;";   break;
-		case COND_NEQ: op_str = "&lt;&gt;";  break;
-		default:
-			abort();
-	}
-	
-	/* Draw relational operator node */
-	char* op_id;
-	asprintf_ff(&op_id, "%p(%s)", self, op_str);
-	Graphviz_drawNode(gv, op_id, op_str);
-	Graphviz_drawEdge(gv, node_id, op_id);
-	
-	/* Draw expression a */
-	char* a_id = ptos(self->left);
-	AST_Expr_drawGraph(self->left, gv);
-	Graphviz_drawEdge(gv, op_id, a_id);
-	destroy(&a_id);
-	
-	/* Draw expression b (if it exists) */
-	if(self->type != COND_ODD) {
-		char* b_id = ptos(self->right);
-		AST_Expr_drawGraph(self->right, gv);
-		Graphviz_drawEdge(gv, op_id, b_id);
-		destroy(&b_id);
-	}
-	
-	destroy(&op_id);
-	destroy(&node_id);
-}
-
 Destroyer(AST_Expr) {
-	release(&self->left);
-	release(&self->right);
+	switch(self->type) {
+		case EXPR_UNINITIALIZED:
+			break;
+		
+		case EXPR_VAR:
+			destroy(&self->values.ident);
+			break;
+		
+		case EXPR_NUM:
+			break;
+		
+		case EXPR_NEG:
+			release(&self->values.operand);
+			break;
+		
+		case EXPR_ADD:
+		case EXPR_SUB:
+		case EXPR_MUL:
+		case EXPR_DIV:
+			release(&self->values.binop.left);
+			release(&self->values.binop.right);
+			break;
+		
+		case EXPR_CALL:
+			destroy(&self->values.call.ident);
+			release(&self->values.call.param_list);
+			break;
+		
+		default:
+			assert(false);
+	}
 }
 DEF(AST_Expr);
-
-void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv) {
-	char* node_id = ptos(self);
-	Graphviz_drawNode(gv, node_id, "<i>expression</i>");
-	
-	/* Draw binop node (+/-) if there are two operands */
-	const char* expr_parent_id = node_id;
-	char* binop_id = NULL;
-	if(self->right != NULL) {
-		const char* op_str = self->subtract ? "-" : "+";
-		asprintf_ff(&binop_id, "%p(%s)", self, op_str);
-		expr_parent_id = binop_id;
-		Graphviz_drawNode(gv, binop_id, op_str);
-		Graphviz_drawEdge(gv, node_id, binop_id);
-	}
-	
-	/* Draw a negation node above a if a is negated */
-	const char* a_parent_id = expr_parent_id;
-	char* neg_id = NULL;
-	if(self->a_negative) {
-		asprintf_ff(&neg_id, "%p(-)", self->left);
-		a_parent_id = neg_id;
-		Graphviz_drawNode(gv, neg_id, "-");
-		Graphviz_drawEdge(gv, expr_parent_id, neg_id);
-	}
-	
-	/* Draw term a */
-	char* a_id = ptos(self->left);
-	AST_Term_drawGraph(self->left, gv);
-	Graphviz_drawEdge(gv, a_parent_id, a_id);
-	destroy(&neg_id);
-	destroy(&a_id);
-	
-	/* Draw expr b (if it exists) */
-	if(self->right != NULL) {
-		char* b_id = ptos(self->right);
-		AST_Expr_drawGraph(self->right, gv);
-		Graphviz_drawEdge(gv, expr_parent_id, b_id);
-		destroy(&b_id);
-	}
-	
-	destroy(&binop_id);
-	destroy(&node_id);
-}
-
-Destroyer(AST_Term) {
-	release(&self->left);
-	release(&self->right);
-}
-DEF(AST_Term);
-
-void AST_Term_drawGraph(AST_Term* self, Graphviz* gv) {
-	char* node_id = ptos(self);
-	Graphviz_drawNode(gv, node_id, "<i>term</i>");
-	
-	/* Draw the binop node if we have two operands */
-	const char* a_parent_id = node_id;
-	char* binop_id = NULL;
-	if(self->right != NULL) {
-		const char* binop_str = self->divide ? "/" : "*";
-		asprintf_ff(&binop_id, "%p(%s)", self, binop_str);
-		a_parent_id = binop_id;
-		Graphviz_drawNode(gv, binop_id, binop_str);
-		Graphviz_drawEdge(gv, node_id, binop_id);
-	}
-	
-	/* Draw factor a */
-	char* a_id = ptos(self->left);
-	AST_Factor_drawGraph(self->left, gv);
-	Graphviz_drawEdge(gv, a_parent_id, a_id);
-	destroy(&a_id);
-	
-	/* Draw term b (if it exists) */
-	if(self->right != NULL) {
-		char* b_id = ptos(self->right);
-		AST_Term_drawGraph(self->right, gv);
-		Graphviz_drawEdge(gv, binop_id, b_id);
-		destroy(&b_id);
-	}
-	
-	destroy(&binop_id);
-	destroy(&node_id);
-}
-
-Destroyer(AST_Factor) {
-	switch(self->type) {
-		case FACT_NULL:
-			break;
-		
-		case FACT_IDENT:
-			release(&self->value.ident);
-			break;
-		
-		case FACT_NUMBER:
-			release(&self->value.number);
-			break;
-		
-		case FACT_EXPR:
-			release(&self->value.expr);
-			break;
-		
-		case FACT_CALL:
-			release(&self->value.call);
-			break;
-		
-		default:
-			abort();
-	}
-}
-DEF(AST_Factor);
-
-void AST_Factor_drawGraph(AST_Factor* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<i>factor</i>");
-	
-	switch(self->type) {
-		case FACT_IDENT:
-			AST_Ident_drawGraph(self->value.ident, gv);
-			Graphviz_drawPtrEdge(gv, self, self->value.ident);
-			break;
-		
-		case FACT_NUMBER:
-			AST_Number_drawGraph(self->value.number, gv);
-			Graphviz_drawPtrEdge(gv, self, self->value.number);
-			break;
-		
-		case FACT_EXPR:
-			AST_Expr_drawGraph(self->value.expr, gv);
-			Graphviz_drawPtrEdge(gv, self, self->value.expr);
-			break;
-		
-		case FACT_CALL:
-			AST_Call_drawGraph(self->value.call, gv);
-			Graphviz_drawPtrEdge(gv, self, self->value.call);
-			break;
-		
-		default:
-			abort();
-	}
-}
-
-Destroyer(AST_Number) {
-	/* Nothing to do */
-}
-DEF(AST_Number);
-
-void AST_Number_drawGraph(AST_Number* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<b>%u</b>", self->num);
-}
-
-Destroyer(AST_Ident) {
-	destroy(&self->name);
-}
-DEF(AST_Ident);
-
-void AST_Ident_drawGraph(AST_Ident* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<b>%s</b>", self->name);
-}
-
-Destroyer(AST_Call) {
-	release(&self->ident);
-	release(&self->param_list);
-}
-DEF(AST_Call);
-
-void AST_Call_drawGraph(AST_Call* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<b>call</b>");
-	AST_Ident_drawGraph(self->ident, gv);
-	Graphviz_drawPtrEdge(gv, self, self->ident);
-	AST_ParamList_drawGraph(self->param_list, gv);
-	Graphviz_drawPtrEdge(gv, self, self->param_list);
-}
 
 Destroyer(AST_ParamList) {
 	size_t i;
@@ -581,149 +187,302 @@ Destroyer(AST_ParamList) {
 }
 DEF(AST_ParamList);
 
-void AST_ParamList_drawGraph(AST_ParamList* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<i>param-list</i>");
-	
-	size_t i;
-	for(i = 0; i < self->param_count; i++) {
-		AST_Expr_drawGraph(self->params[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->params[i]);
-	}
+
+/*! Create an AST node for a block with the provided child nodes
+ @param consts List of constant declarations
+ @param vars List of variable declarations
+ @param procs List of procedure declarations
+ @param stmt Body of the block
+ @return AST node for a block
+ */
+AST_Block* AST_Block_create(AST_ConstDecls* consts, AST_VarDecls* vars, AST_ProcDecls* procs, AST_Stmt* stmt) {
+	AST_Block* ret = AST_Block_new();
+	ret->consts = consts;
+	ret->vars = vars;
+	ret->procs = procs;
+	ret->stmt = stmt;
+	return ret;
 }
 
-/* Statements */
-Destroyer(Stmt_Assign) {
-	release(&self->ident);
-	release(&self->value);
-}
-DEF(Stmt_Assign);
-
-void Stmt_Assign_drawGraph(Stmt_Assign* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, ":=");
-	AST_Ident_drawGraph(self->ident, gv);
-	Graphviz_drawPtrEdge(gv, self, self->ident);
-	AST_Expr_drawGraph(self->value, gv);
-	Graphviz_drawPtrEdge(gv, self, self->value);
-}
-
-Destroyer(Stmt_Call) {
-	release(&self->ident);
-	release(&self->param_list);
-}
-DEF(Stmt_Call);
-
-void Stmt_Call_drawGraph(Stmt_Call* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "call");
-	AST_Ident_drawGraph(self->ident, gv);
-	Graphviz_drawPtrEdge(gv, self, self->ident);
-	
-	if(self->param_list != NULL) {
-		AST_ParamList_drawGraph(self->param_list, gv);
-		Graphviz_drawPtrEdge(gv, self, self->param_list);
-	}
-}
-
-Destroyer(Stmt_Begin) {
-	size_t i;
-	for(i = 0; i < self->stmt_count; i++) {
-		release(&self->stmts[i]);
+/*! Append a constant declaration to a list
+ @param ident Name of constant
+ @param value Value of constant
+ @return self
+ */
+AST_ConstDecls* AST_ConstDecls_append(AST_ConstDecls* self, char* ident, Word value) {
+	/* Allow self to be NULL by allocating a new instance */
+	if(!self) {
+		self = AST_ConstDecls_new();
 	}
 	
-	destroy(&self->stmts);
-}
-DEF(Stmt_Begin);
-
-void Stmt_Begin_drawGraph(Stmt_Begin* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "begin");
-	
-	size_t i;
-	for(i = 0; i < self->stmt_count; i++) {
-		AST_Stmt_drawGraph(self->stmts[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->stmts[i]);
+	/* Enlarge consts array if necessary */
+	if(self->const_count == self->const_cap) {
+		/* Enlarge both allocations */
+		size_t oldcap = self->const_cap;
+		expand(&self->idents, &oldcap);
+		expand(&self->values, &self->const_cap);
 	}
+	
+	/* Append value */
+	self->idents[self->const_count] = ident;
+	self->values[self->const_count++] = value;
+	return self;
 }
 
-Destroyer(Stmt_If) {
-	release(&self->cond);
-	release(&self->then_stmt);
-	release(&self->else_stmt);
+/*! Append a variable declaration to a list
+ @param ident Name of variable
+ @return self
+ */
+AST_VarDecls* AST_VarDecls_append(AST_VarDecls* self, char* ident) {
+	/* Allow self to be NULL by allocating a new instance */
+	if(!self) {
+		self = AST_VarDecls_new();
+	}
+	
+	/* Enlarge vars array if necessary */
+	if(self->var_count == self->var_cap) {
+		expand(&self->vars, &self->var_cap);
+	}
+	
+	/* Append variable */
+	self->vars[self->var_count++] = ident;
+	return self;
 }
-DEF(Stmt_If);
 
-void Stmt_If_drawGraph(Stmt_If* self, Graphviz* gv) {
-	char* node_id = ptos(self);
-	Graphviz_drawNode(gv, node_id, "if");
+/*! Append a procedure declaration to a list
+ @param ident Name of procedure
+ @param param_decls List of parameter declarations
+ @param body Block making up the procedure's body
+ @return self
+ */
+AST_ProcDecls* AST_ProcDecls_append(AST_ProcDecls* self, char* ident, AST_ParamDecls* param_decls, AST_Block* body) {
+	/* Allow self to be NULL by allocating a new instance */
+	if(!self) {
+		self = AST_ProcDecls_new();
+	}
 	
-	/* Draw cond */
-	char* cond_id = ptos(self->cond);
-	AST_Cond_drawGraph(self->cond, gv);
-	Graphviz_drawEdge(gv, node_id, cond_id);
-	destroy(&cond_id);
+	/* Enlarge procs array if necessary */
+	if(self->proc_count == self->proc_cap) {
+		expand(&self->procs, &self->proc_cap);
+	}
 	
-	/* Draw then node */
-	char* then_id;
-	asprintf_ff(&then_id, "%p(then)", self);
-	Graphviz_drawNode(gv, then_id, "then");
-	Graphviz_drawEdge(gv, node_id, then_id);
+	/* Build proc object */
+	AST_Proc* proc = AST_Proc_new();
+	proc->ident = ident;
+	proc->param_decls = param_decls;
+	proc->body = body;
 	
-	/* Draw then statement */
-	char* then_stmt_id = ptos(self->then_stmt);
-	AST_Stmt_drawGraph(self->then_stmt, gv);
-	Graphviz_drawEdge(gv, then_id, then_stmt_id);
-	destroy(&then_stmt_id);
-	destroy(&then_id);
+	/* Append variable */
+	self->procs[self->proc_count++] = proc;
+	return self;
+}
+
+/*! Append a parameter declaration to a list
+ @param ident Name of parameter
+ @return self
+ */
+AST_ParamDecls* AST_ParamDecls_append(AST_ParamDecls* self, char* ident) {
+	/* Allow self to be NULL by allocating a new instance */
+	if(!self) {
+		self = AST_ParamDecls_new();
+	}
 	
-	/* Else is optional */
-	if(self->else_stmt != NULL) {
-		/* Draw else node */
-		char* else_id;
-		asprintf_ff(&else_id, "%p(else)", self);
-		Graphviz_drawNode(gv, else_id, "else");
-		Graphviz_drawEdge(gv, node_id, else_id);
+	/* Enlarge params array if necessary */
+	if(self->param_count == self->param_cap) {
+		expand(&self->params, &self->param_cap);
+	}
+	
+	/* Append parameter */
+	self->params[self->param_count++] = ident;
+	return self;
+}
+
+/*! Create an AST node for a statement with the provided type and child nodes
+ @param type Statement type
+ @note Further parameters depend on the statement type
+ @return AST node for a statement
+ */
+AST_Stmt* AST_Stmt_create(STMT_TYPE type, ...) {
+	VARIADIC(type, ap, {
+		AST_Stmt* ret = AST_Stmt_new();
+		ret->type = type;
 		
-		/* Draw else statement */
-		char* else_stmt_id = ptos(self->else_stmt);
-		AST_Stmt_drawGraph(self->else_stmt, gv);
-		Graphviz_drawEdge(gv, else_id, else_stmt_id);
-		destroy(&else_stmt_id);
-		destroy(&else_id);
+		switch(type) {
+			case STMT_ASSIGN:
+				VA_POP(ap, ret->stmt.assign.ident);
+				VA_POP(ap, ret->stmt.assign.value);
+				break;
+			
+			case STMT_CALL:
+				VA_POP(ap, ret->stmt.call.ident);
+				VA_POP(ap, ret->stmt.call.param_list);
+				break;
+			
+			case STMT_BEGIN:
+				/* Nothing to do */
+				break;
+			
+			case STMT_IF:
+				VA_POP(ap, ret->stmt.if_stmt.cond);
+				VA_POP(ap, ret->stmt.if_stmt.body);
+				break;
+			
+			case STMT_WHILE:
+				VA_POP(ap, ret->stmt.while_stmt.cond);
+				VA_POP(ap, ret->stmt.while_stmt.body);
+				break;
+			
+			case STMT_READ:
+				VA_POP(ap, ret->stmt.read.ident);
+				break;
+			
+			case STMT_WRITE:
+				VA_POP(ap, ret->stmt.write.ident);
+				break;
+			
+			default:
+				assert(false);
+		}
+		
+		return ret;
+	});
+}
+
+/*! Append a statement to a begin statement
+ @param self Statement of type STMT_BEGIN (will be checked with an assertion in debug builds)
+ @param stmt Statement to append to this begin statement
+ @return self
+ */
+AST_Stmt* AST_Stmt_append(AST_Stmt* self, AST_Stmt* stmt) {
+	/* Allow self to be NULL by allocating a new instance */
+	if(!self) {
+		self = AST_Stmt_new();
+		self->type = STMT_BEGIN;
 	}
 	
-	destroy(&node_id);
+	/* Must be a begin statement */
+	assert(self->type == STMT_BEGIN);
+	
+	/* Enlarge stmts array if necessary */
+	if(self->stmt.begin.stmt_count == self->stmt.begin.stmt_cap) {
+		expand(&self->stmt.begin.stmts, &self->stmt.begin.stmt_cap);
+	}
+	
+	/* Append statement to array */
+	self->stmt.begin.stmts[self->stmt.begin.stmt_count++] = stmt;
+	return self;
 }
 
-Destroyer(Stmt_While) {
-	release(&self->cond);
-	release(&self->do_stmt);
+/*! Create an AST node for a condition with the provided type and child nodes
+ @param type Condition type
+ @note Further parameters depend on the condition type
+ @return AST node for a condition
+ */
+AST_Cond* AST_Cond_create(COND_TYPE type, ...) {
+	VARIADIC(type, ap, {
+		AST_Cond* ret = AST_Cond_new();
+		ret->type = type;
+		
+		switch(type) {
+			case COND_ODD:
+				VA_POP(ap, ret->values.operand);
+				break;
+			
+			case COND_EQ:
+			case COND_NE:
+			case COND_LT:
+			case COND_LE:
+			case COND_GT:
+			case COND_GE:
+				VA_POP(ap, ret->values.binop.left);
+				VA_POP(ap, ret->values.binop.right);
+				break;
+			
+			default:
+				assert(false);
+		}
+		
+		return ret;
+	});
 }
-DEF(Stmt_While);
 
-void Stmt_While_drawGraph(Stmt_While* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "while");
-	AST_Cond_drawGraph(self->cond, gv);
-	Graphviz_drawPtrEdge(gv, self, self->cond);
-	AST_Stmt_drawGraph(self->do_stmt, gv);
-	Graphviz_drawPtrEdge(gv, self, self->do_stmt);
+/*! Create an AST node for an expression with the provided type and child nodes
+ @param type Expression type
+ @note Further parameters depend on the expression type
+ @return AST node for an expression
+ */
+AST_Expr* AST_Expr_create(EXPR_TYPE type, ...) {
+	VARIADIC(type, ap, {
+		AST_Expr* ret = AST_Expr_new();
+		ret->type = type;
+		
+		switch(type) {
+			case EXPR_VAR:
+				VA_POP(ap, ret->values.ident);
+				break;
+			
+			case EXPR_NUM:
+				VA_POP(ap, ret->values.num);
+				break;
+			
+			case EXPR_NEG:
+				VA_POP(ap, ret->values.operand);
+				break;
+			
+			case EXPR_ADD:
+			case EXPR_SUB:
+			case EXPR_MUL:
+			case EXPR_DIV:
+				VA_POP(ap, ret->values.binop.left);
+				VA_POP(ap, ret->values.binop.right);
+				break;
+			
+			case EXPR_CALL:
+				VA_POP(ap, ret->values.call.ident);
+				VA_POP(ap, ret->values.call.param_list);
+				break;
+			
+			default:
+				assert(false);
+		}
+		
+		return ret;
+	});
 }
 
-Destroyer(Stmt_Read) {
-	release(&self->ident);
+/*! Applies a unary operator (+/-) to an expression
+ @param unary_op Either EXPR_ADD (+) or EXPR_SUB (-)
+ @return New EXPR_NEG object if unary_op was EXPR_SUB, otherwise just self
+ */
+AST_Expr* AST_Expr_applyUnaryOperator(AST_Expr* self, EXPR_TYPE unary_op) {
+	switch(unary_op) {
+		case EXPR_ADD:
+			return self;
+		
+		case EXPR_SUB:
+			return AST_Expr_create(EXPR_NEG, self);
+		
+		default:
+			abort();
+	}
 }
-DEF(Stmt_Read);
 
-void Stmt_Read_drawGraph(Stmt_Read* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "read");
-	AST_Ident_drawGraph(self->ident, gv);
-	Graphviz_drawPtrEdge(gv, self, self->ident);
-}
-
-Destroyer(Stmt_Write) {
-	release(&self->ident);
-}
-DEF(Stmt_Write);
-
-void Stmt_Write_drawGraph(Stmt_Write* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "write");
-	AST_Ident_drawGraph(self->ident, gv);
-	Graphviz_drawPtrEdge(gv, self, self->ident);
+/*! Append an expression to a parameter list
+ @param expr Expression to compute the parameter value
+ @return self
+ */
+AST_ParamList* AST_ParamList_append(AST_ParamList* self, AST_Expr* expr) {
+	/* Allow self to be NULL by allocating a new instance */
+	if(!self) {
+		self = AST_ParamList_new();
+	}
+	
+	/* Enlarge params array if necessary */
+	if(self->param_count == self->param_cap) {
+		expand(&self->params, &self->param_cap);
+	}
+	
+	/* Append expression to array */
+	self->params[self->param_count++] = expr;
+	return self;
 }

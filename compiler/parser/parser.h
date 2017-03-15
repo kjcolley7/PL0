@@ -31,19 +31,24 @@ DECL(Parser);
 /*! Initializes a parser with a stream of tokens
  @param fin File stream that tokens are read in from
  */
-Parser* Parser_initWithStream(Parser* self, FILE* fin);
+Parser* Parser_initWithFile(Parser* self, FILE* fin);
 
 /*! Initializes a parser with a lexer to read tokens from
  @param lexer Lexer used to stream tokens from
  */
 Parser* Parser_initWithLexer(Parser* self, Lexer* lexer);
 
+/*! Initializes a parser with a token stream
+ @param stream Token stream to read from
+ */
+Parser* Parser_initWithStream(Parser* self, TokenStream* stream);
+
 /*! Parses a program from the parser's input file stream and returns the AST
  @param program Out pointer to abstract syntax tree representing the syntax of
                 the entire program, or NULL on error
  @return True on success or false on error
  */
-bool Parser_parseProgram(Parser* self, AST_Program** program);
+bool Parser_parseProgram(Parser* self, AST_Block** program);
 
 
 #endif /* PL0_PARSER_H */
