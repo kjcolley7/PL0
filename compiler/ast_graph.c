@@ -164,10 +164,18 @@ void AST_ProcDecls_drawGraph(AST_ProcDecls* self, Graphviz* gv) {
  */
 void AST_Proc_drawGraph(AST_Proc* self, Graphviz* gv) {
 	Graphviz_drawPtrNode(gv, self, "<i>procedure</i>");
+	
+	/* ident */
 	Ident_drawGraph(self->ident, gv);
 	Graphviz_drawPtrEdge(gv, self, self->ident);
-	AST_ParamDecls_drawGraph(self->param_decls, gv);
-	Graphviz_drawPtrEdge(gv, self, self->param_decls);
+	
+	/* param-decls */
+	if(self->param_decls != NULL) {
+		AST_ParamDecls_drawGraph(self->param_decls, gv);
+		Graphviz_drawPtrEdge(gv, self, self->param_decls);
+	}
+	
+	/* block */
 	AST_Block_drawGraph(self->body, gv);
 	Graphviz_drawPtrEdge(gv, self, self->body);
 }

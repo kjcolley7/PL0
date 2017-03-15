@@ -164,10 +164,11 @@ static bool SymTree_addProcs(SymTree* self, AST_ProcDecls* decls) {
 		SymTree* child = SymTree_initWithAST(SymTree_alloc(), self, proc->body, self->level + 1);
 		
 		/* Set the parameter count */
-		sym->value.procedure.param_count = proc->param_decls->param_count;
+		size_t param_count = proc->param_decls ? proc->param_decls->param_count : 0;
+		sym->value.procedure.param_count = param_count;
 		
 		/* Add variables for all the parameters */
-		for(j = 0; j < proc->param_decls->param_count; j++) {
+		for(j = 0; j < param_count; j++) {
 			/* Create new parameter symbol for each param */
 			Symbol* param = Symbol_new();
 			param->type = SYM_VAR;
