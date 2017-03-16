@@ -5,6 +5,7 @@ var facRes, facParam;
 procedure Factorial();
 var myFacParam;
 begin
+	if facParam <= 0 then facRes := 1;
 	if facParam > 0 then begin
 		myFacParam:= facParam;
 		facParam:= facParam*2/2 -1*1;
@@ -20,8 +21,6 @@ begin
 		facRes:= facRes * (facParam+1);
 		facParam:= myFacParam;
 	end
-	else
-		facRes:= 1;
 end;
 
 begin

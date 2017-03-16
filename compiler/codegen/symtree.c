@@ -102,11 +102,11 @@ static bool SymTree_addConsts(SymTree* self, AST_ConstDecls* decls) {
 		/* Create a new symbol for the constant */
 		Symbol* sym = Symbol_new();
 		sym->type = SYM_CONST;
-		sym->name = strdup_ff(decls->idents[i]->name);
+		sym->name = strdup_ff(decls->idents[i]);
 		sym->level = self->level;
 		
 		/* Set the constant's numeric value */
-		sym->value.number = decls->values[i]->num;
+		sym->value.number = decls->values[i];
 		
 		/* Add the constant symbol to the current level of the tree */
 		success = SymTree_addSymbol(self, sym);
@@ -129,7 +129,7 @@ static bool SymTree_addVars(SymTree* self, AST_VarDecls* decls) {
 		/* Create a new symbol for the variable */
 		Symbol* sym = Symbol_new();
 		sym->type = SYM_VAR;
-		sym->name = strdup_ff(decls->vars[i]->name);
+		sym->name = strdup_ff(decls->vars[i]);
 		sym->level = self->level;
 		
 		/* Set the variable's local stack offset and increment the offset */
@@ -157,21 +157,22 @@ static bool SymTree_addProcs(SymTree* self, AST_ProcDecls* decls) {
 		Symbol* sym = Symbol_new();
 		AST_Proc* proc = decls->procs[i];
 		sym->type = SYM_PROC;
-		sym->name = strdup_ff(proc->ident->name);
+		sym->name = strdup_ff(proc->ident);
 		sym->level = self->level;
 		
 		/* Create the child symtrees */
 		SymTree* child = SymTree_initWithAST(SymTree_alloc(), self, proc->body, self->level + 1);
 		
 		/* Set the parameter count */
-		sym->value.procedure.param_count = proc->param_decls->param_count;
+		size_t param_count = proc->param_decls ? proc->param_decls->param_count : 0;
+		sym->value.procedure.param_count = param_count;
 		
 		/* Add variables for all the parameters */
-		for(j = 0; j < proc->param_decls->param_count; j++) {
+		for(j = 0; j < param_count; j++) {
 			/* Create new parameter symbol for each param */
 			Symbol* param = Symbol_new();
 			param->type = SYM_VAR;
-			param->name = strdup_ff(proc->param_decls->params[j]->name);
+			param->name = strdup_ff(proc->param_decls->params[j]);
 			param->level = child->level;
 			param->value.frame_offset = child->frame_size++;
 			

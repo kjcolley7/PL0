@@ -28,7 +28,7 @@ DECL(Codegen);
 /*! Initialize a codegen object from the program's AST
  @param prog AST that makes up the entire program
  */
-Codegen* Codegen_initWithAST(Codegen* self, AST_Program* prog);
+Codegen* Codegen_initWithAST(Codegen* self, AST_Block* prog);
 
 /*! Sets addresses and resolves symbols */
 void Codegen_layoutCode(Codegen* self);

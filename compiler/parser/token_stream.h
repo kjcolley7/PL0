@@ -18,6 +18,10 @@ typedef struct TokenStream TokenStream;
 #include "token.h"
 #include "lexer/lexer.h"
 
+#ifdef WITH_BISON
+#include "compiler/parser/parser.y.h"
+#endif
+
 struct TokenStream {
 	OBJECT_BASE;
 	
@@ -34,9 +38,9 @@ DECL(TokenStream);
 
 
 /*! Initializes a TokenStream object to read tokens from the specified stream
- @param stream File stream to read tokens from
+ @param fin File stream to read tokens from
  */
-TokenStream* TokenStream_initWithStream(TokenStream* self, FILE* stream);
+TokenStream* TokenStream_initWithFile(TokenStream* self, FILE* fin);
 
 /*! Initializes a TokenStream object to read tokens from the specified lexer
  @param lexer Lexer to read tokens from
@@ -51,6 +55,11 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok);
 
 /*! Consumes the current token and releases the stream's reference to it */
 void TokenStream_consumeToken(TokenStream* self);
+
+#ifdef WITH_BISON
+/*! Retrieves a token for the Bison parser */
+int yylex(YYSTYPE* lvalp, yyscan_t scanner);
+#endif
 
 
 #endif /* PL0_TOKEN_STREAM_H */

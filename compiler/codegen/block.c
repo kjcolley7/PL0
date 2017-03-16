@@ -32,13 +32,15 @@ Block* Block_initWithScope(Block* self, SymTree* symtree) {
 }
 
 bool Block_generate(Block* self, AST_Block* ast) {
-	size_t i;
-	for(i = 0; i < ast->procs->proc_count; i++) {
-		/* Generate the code for all subprocedures of this procedure */
-		AST_Proc* proc = ast->procs->procs[i];
-		Symbol* sym = SymTree_findSymbol(self->symtree, proc->ident->name);
-		if(!Block_generate(sym->value.procedure.body, proc->body)) {
-			return false;
+	if(ast->procs != NULL) {
+		size_t i;
+		for(i = 0; i < ast->procs->proc_count; i++) {
+			/* Generate the code for all subprocedures of this procedure */
+			AST_Proc* proc = ast->procs->procs[i];
+			Symbol* sym = SymTree_findSymbol(self->symtree, proc->ident);
+			if(!Block_generate(sym->value.procedure.body, proc->body)) {
+				return false;
+			}
 		}
 	}
 	

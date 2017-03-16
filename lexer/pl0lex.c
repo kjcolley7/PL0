@@ -38,14 +38,11 @@ static void writeWhitespace(void* cookie, char c);
 
 
 int run_lexer(LexerFiles* files) {
-	/* Create the lexer instance */
-	Lexer* lexer = Lexer_initWithStream(Lexer_alloc(), files->input);
+	/* Create the PL/0 lexer instance */
+	Lexer* lexer = PL0Lexer_initWithFile(Lexer_alloc(), files->input);
 	
 	/* Make sure that we write the whitespace ignored by the lexer to the clean source file */
 	Lexer_setWhitespaceCallback(lexer, &writeWhitespace, files);
-	
-	/* Add PL/0's tokens to the lexer */
-	add_pl0_tokens(lexer);
 	
 	/* Draw lexer graph */
 	Graphviz* gv = Graphviz_initWithFile(Graphviz_alloc(), files->graph, "Lexer");
@@ -92,6 +89,15 @@ int run_lexer(LexerFiles* files) {
 	fflush(files->tokenlist);
 	
 	return err;
+}
+
+Lexer* PL0Lexer_initWithFile(Lexer* self, FILE* fin) {
+	if((self = Lexer_initWithFile(self, fin))) {
+		/* Add PL/0's tokens to the lexer */
+		add_pl0_tokens(self);
+	}
+	
+	return self;
 }
 
 static Token* accept_comment(Lexer* lexer) {
@@ -199,11 +205,11 @@ static void add_pl0_tokens(Lexer* lexer) {
 	/* Recognize the tail of an identifier, [a-zA-Z0-9]* (weakly referenced) */
 	State* state_ident_middle = State_initWithAcceptor(State_alloc(), "ID", &accept_identifier);
 	Transition* trans_ident_middle = Transition_initWithMatcher(
-																Transition_alloc(),
-																"[a-zA-Z0-9]",
-																state_ident_middle,
-																false,
-																&match_ident_middle);
+		Transition_alloc(),
+		"[a-zA-Z0-9]",
+		state_ident_middle,
+		false,
+		&match_ident_middle);
 	State_addTransition(state_ident_middle, trans_ident_middle);
 	
 	/* Punctuation, matching exactly */
@@ -242,11 +248,11 @@ static void add_pl0_tokens(Lexer* lexer) {
 	
 	/* First character of identifiers, matching [a-zA-Z] (strongly referenced) */
 	Transition* trans_ident_begin = Transition_initWithMatcher(
-															   Transition_alloc(),
-															   "[a-zA-Z]",
-															   state_ident_middle,
-															   true,
-															   &match_ident_begin);
+		Transition_alloc(),
+		"[a-zA-Z]",
+		state_ident_middle,
+		true,
+		&match_ident_begin);
 	State_addTransition(first_state, trans_ident_begin);
 	
 	/* Add transitions from each partial reserved word to identsym, for example "white" */
@@ -255,30 +261,30 @@ static void add_pl0_tokens(Lexer* lexer) {
 	/* Numbers, matching [0-9]+ (weakly referenced) */
 	State* state_number = State_initWithAcceptor(State_alloc(), "NUMBER", &accept_number);
 	Transition* weak_trans_number = Transition_initWithMatcher(
-															   Transition_alloc(),
-															   "[0-9]",
-															   state_number,
-															   false,
-															   &match_number);
+		Transition_alloc(),
+		"[0-9]",
+		state_number,
+		false,
+		&match_number);
 	State_addTransition(state_number, weak_trans_number);
 	
 	/* So that first_state indirectly holds a strong reference to state_number */
 	Transition* trans_number = Transition_initWithMatcher(
-														  Transition_alloc(),
-														  "[0-9]",
-														  state_number,
-														  true,
-														  &match_number);
+		Transition_alloc(),
+		"[0-9]",
+		state_number,
+		true,
+		&match_number);
 	State_addTransition(first_state, trans_number);
 	
 	/* Invalid variable names, matching [0-9]+[a-zA-Z] (strongly referenced) */
 	State* state_invalid_varname = State_initWithAcceptor(State_alloc(), "INVALID", &accept_invalid_varname);
 	Transition* trans_invalid_varname = Transition_initWithMatcher(
-																   Transition_alloc(),
-																   "[a-zA-Z]",
-																   state_invalid_varname,
-																   true,
-																   &match_ident_begin);
+		Transition_alloc(),
+		"[a-zA-Z]",
+		state_invalid_varname,
+		true,
+		&match_ident_begin);
 	State_addTransition(state_number, trans_invalid_varname);
 	
 	/* Comments, like this one */

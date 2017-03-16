@@ -7,7 +7,9 @@
 //
 
 #include "token_stream.h"
+#include <stdlib.h>
 #include <string.h>
+#include "config.h"
 
 
 Destroyer(TokenStream) {
@@ -16,7 +18,7 @@ Destroyer(TokenStream) {
 }
 DEF(TokenStream);
 
-TokenStream* TokenStream_initWithStream(TokenStream* self, FILE* stream) {
+TokenStream* TokenStream_initWithFile(TokenStream* self, FILE* stream) {
 	if((self = TokenStream_init(self))) {
 		self->fin = stream;
 	}
@@ -116,3 +118,37 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 void TokenStream_consumeToken(TokenStream* self) {
 	release(&self->token);
 }
+
+#ifdef WITH_BISON
+int yylex(YYSTYPE* lvalp, yyscan_t scanner) {
+	/* Get next token */
+	Token* tok;
+	if(!TokenStream_peekToken(scanner, &tok)) {
+		return -1;
+	}
+	
+	/* Set lvalp if the token has an associated value */
+	int ret = tok->type;
+	switch(tok->type) {
+		case identsym:
+			lvalp->ident = strdup(tok->lexeme);
+			break;
+		
+		case numbersym:
+			lvalp->num = (Word)strtoul(tok->lexeme, NULL, 10);
+			break;
+		
+		case nulsym:
+			/* EOF */
+			ret = 0;
+			break;
+		
+		default:
+			break;
+	}
+	
+	/* Release tok */
+	TokenStream_consumeToken(scanner);
+	return ret;
+}
+#endif /* WITH_BISON */

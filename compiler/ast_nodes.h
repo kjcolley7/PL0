@@ -16,15 +16,15 @@
 
 #include <stddef.h>
 #include <stdbool.h>
-#include <stdio.h>
+#include "object.h"
+#include "config.h"
 
 /* Enum declarations */
 typedef enum STMT_TYPE STMT_TYPE;
 typedef enum COND_TYPE COND_TYPE;
-typedef enum FACT_TYPE FACT_TYPE;
+typedef enum EXPR_TYPE EXPR_TYPE;
 
 /* Forward declarations */
-typedef struct AST_Program AST_Program;
 typedef struct AST_Block AST_Block;
 typedef struct AST_ConstDecls AST_ConstDecls;
 typedef struct AST_VarDecls AST_VarDecls;
@@ -36,64 +36,45 @@ typedef struct AST_Cond AST_Cond;
 typedef struct AST_Expr AST_Expr;
 typedef struct AST_Term AST_Term;
 typedef struct AST_Factor AST_Factor;
-typedef struct AST_Number AST_Number;
-typedef struct AST_Ident AST_Ident;
-typedef struct AST_Call AST_Call;
 typedef struct AST_ParamList AST_ParamList;
-
-/* Statement types */
-typedef struct Stmt_Assign Stmt_Assign;
-typedef struct Stmt_Call Stmt_Call;
-typedef struct Stmt_Begin Stmt_Begin;
-typedef struct Stmt_If Stmt_If;
-typedef struct Stmt_While Stmt_While;
-typedef struct Stmt_Read Stmt_Read;
-typedef struct Stmt_Write Stmt_Write;
-
-#include "object.h"
-#include "graphviz.h"
 
 
 enum STMT_TYPE {
+	STMT_UNINITIALIZED = 0,
 	STMT_ASSIGN = 1,
 	STMT_CALL,
 	STMT_BEGIN,
 	STMT_IF,
 	STMT_WHILE,
 	STMT_READ,
-	STMT_WRITE,
-	STMT_EMPTY
+	STMT_WRITE
 };
 
 enum COND_TYPE {
+	COND_UNINITIALIZED = 0,
 	COND_ODD = 1,
 	COND_EQ,
-	COND_NEQ,
+	COND_NE,
 	COND_LT,
 	COND_LE,
 	COND_GT,
 	COND_GE
 };
 
-enum FACT_TYPE {
-	FACT_NULL = 0,
-	FACT_IDENT = 1,
-	FACT_NUMBER,
-	FACT_EXPR,
-	FACT_CALL
+enum EXPR_TYPE {
+	EXPR_UNINITIALIZED = 0,
+	EXPR_VAR = 1,
+	EXPR_NUM,
+	EXPR_NEG,
+	EXPR_ADD,
+	EXPR_SUB,
+	EXPR_MUL,
+	EXPR_DIV,
+	EXPR_CALL
 };
 
 
-/* Top-level AST nodes */
-
-struct AST_Program {
-	OBJECT_BASE;
-	
-	AST_Block* block;
-};
-DECL(AST_Program);
-void AST_Program_drawGraph(AST_Program* self, Graphviz* gv);
-
+/* AST node structures */
 
 struct AST_Block {
 	OBJECT_BASE;
@@ -101,31 +82,28 @@ struct AST_Block {
 	AST_ConstDecls* consts;       /*!< Optional */
 	AST_VarDecls* vars;           /*!< Optional */
 	AST_ProcDecls* procs;         /*!< Optional */
-	AST_Stmt* stmt;               /*!< Required */
+	AST_Stmt* stmt;               /*!< Optional */
 };
 DECL(AST_Block);
-void AST_Block_drawGraph(AST_Block* self, Graphviz* gv);
 
 struct AST_ConstDecls {
 	OBJECT_BASE;
 	
 	size_t const_count;           /*!< At least one required */
 	size_t const_cap;
-	AST_Ident** idents;
-	AST_Number** values;
+	char** idents;
+	Word* values;
 };
 DECL(AST_ConstDecls);
-void AST_ConstDecls_drawGraph(AST_ConstDecls* self, Graphviz* gv);
 
 struct AST_VarDecls {
 	OBJECT_BASE;
 	
 	size_t var_count;             /*!< At least one required */
 	size_t var_cap;
-	AST_Ident** vars;
+	char** vars;
 };
 DECL(AST_VarDecls);
-void AST_VarDecls_drawGraph(AST_VarDecls* self, Graphviz* gv);
 
 struct AST_ProcDecls {
 	OBJECT_BASE;
@@ -135,114 +113,95 @@ struct AST_ProcDecls {
 	AST_Proc** procs;
 };
 DECL(AST_ProcDecls);
-void AST_ProcDecls_drawGraph(AST_ProcDecls* self, Graphviz* gv);
 
 struct AST_Proc {
 	OBJECT_BASE;
 	
-	AST_Ident* ident;             /*!< Required */
-	AST_Block* body;              /*!< Required */
+	char* ident;                  /*!< Required */
 	AST_ParamDecls* param_decls;  /*!< Required */
+	AST_Block* body;              /*!< Required */
 };
 DECL(AST_Proc);
-void AST_Proc_drawGraph(AST_Proc* self, Graphviz* gv);
 
 struct AST_ParamDecls {
 	OBJECT_BASE;
 	
 	size_t param_count;           /*!< Zero or more */
 	size_t param_cap;
-	AST_Ident** params;
+	char** params;
 };
 DECL(AST_ParamDecls);
-void AST_ParamDecls_drawGraph(AST_ParamDecls* self, Graphviz* gv);
 
 struct AST_Stmt {
 	OBJECT_BASE;
 	
 	STMT_TYPE type;
 	union {
-		Stmt_Assign* assign;
-		Stmt_Call* call;
-		Stmt_Begin* begin;
-		Stmt_If* if_stmt;
-		Stmt_While* while_stmt;
-		Stmt_Read* read;
-		Stmt_Write* write;
-	} stmt;                       /*!< Optional (when type == STMT_EMPTY) */
+		struct {
+			char* ident;
+			AST_Expr* value;
+		} assign;                 /*!< STMT_ASSIGN */
+		struct {
+			char* ident;
+			AST_ParamList* param_list;
+		} call;                   /*!< STMT_CALL */
+		struct {
+			size_t stmt_count;
+			size_t stmt_cap;
+			AST_Stmt** stmts;
+		} begin;                  /*!< STMT_BEGIN */
+		struct {
+			AST_Cond* cond;
+			AST_Stmt* then_stmt;
+			AST_Stmt* else_stmt;
+		} if_stmt;                /*!< STMT_IF */
+		struct {
+			AST_Cond* cond;
+			AST_Stmt* do_stmt;
+		} while_stmt;             /*!< STMT_WHILE */
+		struct {
+			char* ident;
+		} read;                   /*!< STMT_READ */
+		struct {
+			char* ident;
+		} write;                  /*!< STMT_WRITE */
+	} stmt;                       /*!< Required */
 };
 DECL(AST_Stmt);
-void AST_Stmt_drawGraph(AST_Stmt* self, Graphviz* gv);
 
 struct AST_Cond {
 	OBJECT_BASE;
 	
 	COND_TYPE type;
-	AST_Expr* left;               /*!< Required */
-	AST_Expr* right;              /*!< Optional (when type == COND_ODD) */
+	union {
+		AST_Expr* operand;        /*!< COND_ODD (unary operator) */
+		struct {
+			AST_Expr* left;
+			AST_Expr* right;
+		} binop;                  /*!< COND_{EQ,NE,LT,LE,GT,GE} (binary operators) */
+	} values;                     /*!< Required */
 };
 DECL(AST_Cond);
-void AST_Cond_drawGraph(AST_Cond* self, Graphviz* gv);
 
 struct AST_Expr {
 	OBJECT_BASE;
 	
-	bool a_negative;
-	bool subtract;
-	AST_Term* left;               /*!< Required */
-	AST_Expr* right;              /*!< Optional */
+	EXPR_TYPE type;
+	union {
+		char* ident;              /*!< EXPR_VAR (variable name) */
+		Word num;                 /*!< EXPR_NUM (integer literal) */
+		AST_Expr* operand;        /*!< EXPR_NEG (unary operator) */
+		struct {
+			AST_Expr* left;
+			AST_Expr* right;
+		} binop;                  /*!< EXPR_{ADD,SUB,MUL,DIV} (binary operators) */
+		struct {
+			char* ident;
+			AST_ParamList* param_list;
+		} call;                   /*!< EXPR_CALL (procedure call) */
+	} values;                     /*!< Required */
 };
 DECL(AST_Expr);
-void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv);
-
-struct AST_Term {
-	OBJECT_BASE;
-	
-	bool divide;
-	AST_Factor* left;             /*!< Required */
-	AST_Term* right;              /*!< Optional */
-};
-DECL(AST_Term);
-void AST_Term_drawGraph(AST_Term* self, Graphviz* gv);
-
-struct AST_Factor {
-	OBJECT_BASE;
-	
-	FACT_TYPE type;
-	union {
-		AST_Ident* ident;
-		AST_Number* number;
-		AST_Expr* expr;
-		AST_Call* call;
-	} value;                      /*!< Required */
-};
-DECL(AST_Factor);
-void AST_Factor_drawGraph(AST_Factor* self, Graphviz* gv);
-
-struct AST_Number {
-	OBJECT_BASE;
-	
-	unsigned num;
-};
-DECL(AST_Number);
-void AST_Number_drawGraph(AST_Number* self, Graphviz* gv);
-
-struct AST_Ident {
-	OBJECT_BASE;
-	
-	char* name;                   /*!< Required */
-};
-DECL(AST_Ident);
-void AST_Ident_drawGraph(AST_Ident* self, Graphviz* gv);
-
-struct AST_Call {
-	OBJECT_BASE;
-	
-	AST_Ident* ident;             /*!< Required */
-	AST_ParamList* param_list;    /*!< Required */
-};
-DECL(AST_Call);
-void AST_Call_drawGraph(AST_Call* self, Graphviz* gv);
 
 struct AST_ParamList {
 	OBJECT_BASE;
@@ -252,72 +211,84 @@ struct AST_ParamList {
 	AST_Expr** params;
 };
 DECL(AST_ParamList);
-void AST_ParamList_drawGraph(AST_ParamList* self, Graphviz* gv);
 
 
-/* Statements */
+/* Additional AST helper methods */
 
-struct Stmt_Assign {
-	OBJECT_BASE;
-	
-	AST_Ident* ident;             /*!< Required */
-	AST_Expr* value;              /*!< Required */
-};
-DECL(Stmt_Assign);
-void Stmt_Assign_drawGraph(Stmt_Assign* self, Graphviz* gv);
+/*! Create an AST node for a block with the provided child nodes
+ @param consts List of constant declarations
+ @param vars List of variable declarations
+ @param procs List of procedure declarations
+ @param stmt Body of the block
+ @return AST node for a block
+ */
+AST_Block* AST_Block_create(AST_ConstDecls* consts, AST_VarDecls* vars, AST_ProcDecls* procs, AST_Stmt* stmt);
 
-struct Stmt_Call {
-	OBJECT_BASE;
-	
-	AST_Ident* ident;             /*!< Required */
-	AST_ParamList* param_list;    /*!< Optional */
-};
-DECL(Stmt_Call);
-void Stmt_Call_drawGraph(Stmt_Call* self, Graphviz* gv);
+/*! Append a constant declaration to a list
+ @param ident Name of constant
+ @param value Value of constant
+ @return self
+ */
+AST_ConstDecls* AST_ConstDecls_append(AST_ConstDecls* self, char* ident, Word value);
 
-struct Stmt_Begin {
-	OBJECT_BASE;
-	
-	size_t stmt_count;            /*!< At least one required */
-	size_t stmt_cap;
-	AST_Stmt** stmts;
-};
-DECL(Stmt_Begin);
-void Stmt_Begin_drawGraph(Stmt_Begin* self, Graphviz* gv);
+/*! Append a variable declaration to a list
+ @param ident Name of variable
+ @return self
+ */
+AST_VarDecls* AST_VarDecls_append(AST_VarDecls* self, char* ident);
 
-struct Stmt_If {
-	OBJECT_BASE;
-	
-	AST_Cond* cond;               /*!< Required */
-	AST_Stmt* then_stmt;          /*!< Required */
-	AST_Stmt* else_stmt;          /*!< Optional */
-};
-DECL(Stmt_If);
-void Stmt_If_drawGraph(Stmt_If* self, Graphviz* gv);
+/*! Append a procedure declaration to a list
+ @param ident Name of procedure
+ @param param_decls List of parameter declarations
+ @param body Block making up the procedure's body
+ @return self
+ */
+AST_ProcDecls* AST_ProcDecls_append(AST_ProcDecls* self, char* ident, AST_ParamDecls* param_decls, AST_Block* body);
 
-struct Stmt_While {
-	OBJECT_BASE;
-	
-	AST_Cond* cond;               /*!< Required */
-	AST_Stmt* do_stmt;            /*!< Required */
-};
-DECL(Stmt_While);
-void Stmt_While_drawGraph(Stmt_While* self, Graphviz* gv);
+/*! Append a parameter declaration to a list
+ @param ident Name of parameter
+ @return self
+ */
+AST_ParamDecls* AST_ParamDecls_append(AST_ParamDecls* self, char* ident);
 
-struct Stmt_Read {
-	OBJECT_BASE;
-	
-	AST_Ident* ident;             /*!< Required */
-};
-DECL(Stmt_Read);
-void Stmt_Read_drawGraph(Stmt_Read* self, Graphviz* gv);
+/*! Create an AST node for a statement with the provided type and child nodes
+ @param type Statement type
+ @note Further parameters depend on the statement type
+ @return AST node for a statement
+ */
+AST_Stmt* AST_Stmt_create(STMT_TYPE type, ...);
 
-struct Stmt_Write {
-	OBJECT_BASE;
-	
-	AST_Ident* ident;             /*!< Required */
-};
-DECL(Stmt_Write);
-void Stmt_Write_drawGraph(Stmt_Write* self, Graphviz* gv);
+/*! Append a statement to a begin statement
+ @param self Statement of type STMT_BEGIN (will be checked with an assertion in debug builds)
+ @param stmt Statement to append to this begin statement
+ @return self
+ */
+AST_Stmt* AST_Stmt_append(AST_Stmt* self, AST_Stmt* stmt);
+
+/*! Create an AST node for a condition with the provided type and child nodes
+ @param type Condition type
+ @note Further parameters depend on the condition type
+ @return AST node for a condition
+ */
+AST_Cond* AST_Cond_create(COND_TYPE type, ...);
+
+/*! Create an AST node for an expression with the provided type and child nodes
+ @param type Expression type
+ @note Further parameters depend on the expression type
+ @return AST node for an expression
+ */
+AST_Expr* AST_Expr_create(EXPR_TYPE type, ...);
+
+/*! Applies a unary operator (+/-) to an expression
+ @param unary_op Either EXPR_ADD (+) or EXPR_SUB (-)
+ @return New EXPR_NEG object if unary_op was EXPR_SUB, otherwise just self
+ */
+AST_Expr* AST_Expr_applyUnaryOperator(AST_Expr* self, EXPR_TYPE unary_op);
+
+/*! Append an expression to a parameter list
+ @param expr Expression to compute the parameter value
+ @return self
+ */
+AST_ParamList* AST_ParamList_append(AST_ParamList* self, AST_Expr* expr);
 
 #endif /* PL0_AST_NODES_H */
