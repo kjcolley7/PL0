@@ -58,8 +58,8 @@ static bool Parser_parseStmtRead(Parser* self, AST_Stmt** statement);
 static bool Parser_parseStmtWrite(Parser* self, AST_Stmt** statement);
 static bool Parser_parseCond(Parser* self, AST_Cond** condition);
 static bool Parser_parseExpr(Parser* self, AST_Expr** expression);
-static bool Parser_parseRawExpr(Parser* self, AST_Expr** expression);
-static bool Parser_parseTerm(Parser* self, AST_Expr** term);
+static bool Parser_parseRawExpr(Parser* self, AST_Expr** expression, bool negate);
+static bool Parser_parseTerm(Parser* self, AST_Expr** term, bool negate);
 static bool Parser_parseFactor(Parser* self, AST_Expr** factor);
 static bool Parser_parseParamList(Parser* self, AST_ParamList** param_list);
 static bool Parser_parseIdent(Parser* self, char** identifier);
@@ -525,20 +525,12 @@ static bool Parser_parseExpr(Parser* self, AST_Expr** expression) {
 	/* Try to consume a unary plus or minus operator token */
 	if(TokenStream_peekToken(self->token_stream, &tok)
 	   && (tok->type == plussym || tok->type == minussym)) {
-		TokenStream_consumeToken(self->token_stream);
 		negate = tok->type == minussym;
+		TokenStream_consumeToken(self->token_stream);
 	}
 	
 	/* Parse the raw expression */
-	if(!Parser_parseRawExpr(self, expression)) {
-		return false;
-	}
-	
-	/* Make the first operand negative if we found a unary minus operator */
-	if(negate) {
-		*expression = AST_Expr_create(EXPR_NEG, *expression);
-	}
-	return true;
+	return Parser_parseRawExpr(self, expression, negate);
 }
 
 /*! Grammar:
@@ -546,13 +538,13 @@ static bool Parser_parseExpr(Parser* self, AST_Expr** expression) {
  raw-expression ::= term [ ("+"|"-") raw-expression ]
  @endcode
  */
-static bool Parser_parseRawExpr(Parser* self, AST_Expr** expression) {
+static bool Parser_parseRawExpr(Parser* self, AST_Expr** expression, bool negate) {
 	*expression = NULL;
 	Token* tok;
 	AST_Expr* expr;
 	
 	/* Parse left term of the expression */
-	if(!Parser_parseTerm(self, &expr)) {
+	if(!Parser_parseTerm(self, &expr, negate)) {
 		return false;
 	}
 	
@@ -565,7 +557,7 @@ static bool Parser_parseRawExpr(Parser* self, AST_Expr** expression) {
 		
 		/* Parse right expression of the expression */
 		AST_Expr* right;
-		if(!Parser_parseRawExpr(self, &right)) {
+		if(!Parser_parseRawExpr(self, &right, false)) {
 			release(&expr);
 			return false;
 		}
@@ -583,7 +575,7 @@ static bool Parser_parseRawExpr(Parser* self, AST_Expr** expression) {
  term ::= factor [ ("*"|"/") term ]
  @endcode
  */
-static bool Parser_parseTerm(Parser* self, AST_Expr** term) {
+static bool Parser_parseTerm(Parser* self, AST_Expr** term, bool negate) {
 	*term = NULL;
 	Token* tok;
 	AST_Expr* trm;
@@ -591,6 +583,11 @@ static bool Parser_parseTerm(Parser* self, AST_Expr** term) {
 	/* Parse the left factor */
 	if(!Parser_parseFactor(self, &trm)) {
 		return false;
+	}
+	
+	/* Negate left factor if told */
+	if(negate) {
+		trm = AST_Expr_create(EXPR_NEG, trm);
 	}
 	
 	/* Try to consume a multiplication or division operator token */
@@ -602,7 +599,7 @@ static bool Parser_parseTerm(Parser* self, AST_Expr** term) {
 		
 		/* Parse right side */
 		AST_Expr* right;
-		if(!Parser_parseTerm(self, &right)) {
+		if(!Parser_parseTerm(self, &right, false)) {
 			release(&trm);
 			return false;
 		}
@@ -959,7 +956,8 @@ static bool Parser_parseStmtIf(Parser* self, AST_Stmt** if_statement) {
 	*if_statement = NULL;
 	Token* tok;
 	AST_Cond* cond;
-	AST_Stmt* body;
+	AST_Stmt* then_stmt;
+	AST_Stmt* else_stmt = NULL;
 	
 	/* Consume "if" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != ifsym) {
@@ -983,14 +981,28 @@ static bool Parser_parseStmtIf(Parser* self, AST_Stmt** if_statement) {
 	TokenStream_consumeToken(self->token_stream);
 	
 	/* Parse body of the "then" branch of the if statement */
-	if(!Parser_parseStmt(self, &body)) {
+	if(!Parser_parseStmt(self, &then_stmt)) {
 		syntaxError("Expected statement after \"then\" in \"if\" statement");
 		release(&cond);
 		return false;
 	}
 	
+	/* Check if we have an "else" branch for this if statement */
+	if(TokenStream_peekToken(self->token_stream, &tok) && tok->type == elsesym) {
+		/* Consume "else" */
+		TokenStream_consumeToken(self->token_stream);
+		
+		/* Parse body of the "else" branch of the if statement */
+		if(!Parser_parseStmt(self, &else_stmt)) {
+			syntaxError("Expected statement after \"else\" in \"if\" statement");
+			release(&then_stmt);
+			release(&cond);
+			return false;
+		}
+	}
+	
 	/* Create if statement */
-	*if_statement = AST_Stmt_create(STMT_IF, cond, body);
+	*if_statement = AST_Stmt_create(STMT_IF, cond, then_stmt, else_stmt);
 	return true;
 }
 

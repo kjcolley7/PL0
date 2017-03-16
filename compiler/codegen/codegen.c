@@ -179,7 +179,7 @@ static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement) {
 			BasicBlock_setTarget(cond, true_branch_begin);
 			
 			/* Generate code for the then statement of the if statement */
-			if(!genStmt(scope, code, statement->stmt.if_stmt.body)) {
+			if(!genStmt(scope, code, statement->stmt.if_stmt.then_stmt)) {
 				return false;
 			}
 			
@@ -190,8 +190,26 @@ static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement) {
 			BasicBlock* false_branch_begin = BasicBlock_createNext(code);
 			BasicBlock_setFalseTarget(cond, false_branch_begin);
 			
-			/* There is no else statement, so make the code from the true branch rejoin the false branch */
-			BasicBlock_setTarget(true_branch_end, false_branch_begin);
+			/* Does this if statement have an else branch to it? */
+			if(statement->stmt.if_stmt.else_stmt == NULL) {
+				/* There is no else statement, so make the code from the true branch rejoin the false branch */
+				BasicBlock_setTarget(true_branch_end, false_branch_begin);
+			}
+			else {
+				/* Generate code for the else statement of the if statement */
+				if(!genStmt(scope, code, statement->stmt.if_stmt.else_stmt)) {
+					return false;
+				}
+				
+				/* Remember the end of the false branch */
+				BasicBlock* false_branch_end = *code;
+				
+				/* Create an empty basic block for both branches to rejoin into */
+				BasicBlock* endif = BasicBlock_createNext(code);
+				BasicBlock_setTarget(true_branch_end, endif);
+				BasicBlock_setTarget(false_branch_end, endif);
+			}
+			
 			return true;
 		}
 		
@@ -213,7 +231,7 @@ static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement) {
 			BasicBlock_setTarget(cond, loop_body_begin);
 			
 			/* Generate code for the body of the while statement */
-			if(!genStmt(scope, code, statement->stmt.while_stmt.body)) {
+			if(!genStmt(scope, code, statement->stmt.while_stmt.do_stmt)) {
 				return false;
 			}
 			

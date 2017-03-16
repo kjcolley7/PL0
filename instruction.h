@@ -49,17 +49,6 @@ typedef uint16_t Opcode;
 #define ALU_GEQ    13
 #define ALU_COUNT  (ALU_GEQ + 1)
 
-/* Colors for instruction groups */
-#define CAL_COLOR   "magenta"
-#define JMP_COLOR   "blue"
-#define LDS_COLOR   "forestgreen"
-#define RET_COLOR   "red"
-#define ARITH_COLOR "orange"
-#define COND_COLOR  "purple"
-#define IO_COLOR    "brown"
-#define LIT_COLOR   "dodgerblue"
-#define INC_COLOR   "tan"
-
 
 /*! Defines the format of a PM/0 instruction (64-bits) */
 struct Insn {

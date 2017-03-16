@@ -38,5 +38,25 @@ typedef int32_t Word;
 /* Represents an address that is currently undefined */
 #define ADDR_UND ((Word)-1)
 
+/* Colors for instruction groups */
+#define CAL_COLOR   "magenta"
+#define JMP_COLOR   "blue"
+#define LDS_COLOR   "forestgreen"
+#define RET_COLOR   "red"
+#define ARITH_COLOR "orange"
+#define COND_COLOR  "purple"
+#define IO_COLOR    "brown"
+#define LIT_COLOR   "dodgerblue"
+#define INC_COLOR   "tan"
+
+/* Colors and fonts for AST nodes */
+#define NONTERMINAL_FONT  "Times-Italic"
+#define TERMINAL_FONT     "Courier-Bold"
+#define FACE_NONTERMINAL  "face=\"" NONTERMINAL_FONT "\""
+#define FACE_TERMINAL     "face=\"" TERMINAL_FONT "\""
+#define COLOR_NUM         "color=\"" LIT_COLOR "\""
+#define COLOR_VAR         "color=\"" LDS_COLOR "\""
+#define COLOR_PROC        "color=\"" CAL_COLOR "\""
+
 
 #endif /* PL0_CONFIG_H */

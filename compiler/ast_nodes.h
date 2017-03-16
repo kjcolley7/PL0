@@ -152,11 +152,12 @@ struct AST_Stmt {
 		} begin;                  /*!< STMT_BEGIN */
 		struct {
 			AST_Cond* cond;
-			AST_Stmt* body;
+			AST_Stmt* then_stmt;
+			AST_Stmt* else_stmt;
 		} if_stmt;                /*!< STMT_IF */
 		struct {
 			AST_Cond* cond;
-			AST_Stmt* body;
+			AST_Stmt* do_stmt;
 		} while_stmt;             /*!< STMT_WHILE */
 		struct {
 			char* ident;

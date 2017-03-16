@@ -58,7 +58,7 @@ void TokenStream_consumeToken(TokenStream* self);
 
 #ifdef WITH_BISON
 /*! Retrieves a token for the Bison parser */
-int yylex(YYSTYPE* lvalp, TokenStream* scanner);
+int yylex(YYSTYPE* lvalp, yyscan_t scanner);
 #endif
 
 

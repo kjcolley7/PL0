@@ -209,3 +209,7 @@ clean:
 	$(_v)rm -rf $(BUILD) $(TARGET) $(ZIP) $(OUTPUTS)
 
 .PHONY: all debug debug+ run archive graph clean
+
+# Disable stupid built-in rules
+MAKEFLAGS += --no-builtin-rules
+.SUFFIXES:

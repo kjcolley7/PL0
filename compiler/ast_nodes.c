@@ -96,12 +96,13 @@ Destroyer(AST_Stmt) {
 		
 		case STMT_IF:
 			release(&self->stmt.if_stmt.cond);
-			release(&self->stmt.if_stmt.body);
+			release(&self->stmt.if_stmt.then_stmt);
+			release(&self->stmt.if_stmt.else_stmt);
 			break;
 		
 		case STMT_WHILE:
 			release(&self->stmt.while_stmt.cond);
-			release(&self->stmt.while_stmt.body);
+			release(&self->stmt.while_stmt.do_stmt);
 			break;
 		
 		case STMT_READ:
@@ -324,12 +325,13 @@ AST_Stmt* AST_Stmt_create(STMT_TYPE type, ...) {
 			
 			case STMT_IF:
 				VA_POP(ap, ret->stmt.if_stmt.cond);
-				VA_POP(ap, ret->stmt.if_stmt.body);
+				VA_POP(ap, ret->stmt.if_stmt.then_stmt);
+				VA_POP(ap, ret->stmt.if_stmt.else_stmt);
 				break;
 			
 			case STMT_WHILE:
 				VA_POP(ap, ret->stmt.while_stmt.cond);
-				VA_POP(ap, ret->stmt.while_stmt.body);
+				VA_POP(ap, ret->stmt.while_stmt.do_stmt);
 				break;
 			
 			case STMT_READ:
@@ -354,6 +356,11 @@ AST_Stmt* AST_Stmt_create(STMT_TYPE type, ...) {
  @return self
  */
 AST_Stmt* AST_Stmt_append(AST_Stmt* self, AST_Stmt* stmt) {
+	/* Don't bother appending empty statements */
+	if(!stmt) {
+		return self;
+	}
+	
 	/* Allow self to be NULL by allocating a new instance */
 	if(!self) {
 		self = AST_Stmt_new();

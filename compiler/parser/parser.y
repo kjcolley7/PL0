@@ -1,10 +1,14 @@
+/* Generate a thread-safe reentrant parser */
 %define api.pure full
+
+/* Declares yylex as `int yylex(YYSTYPE* lvalp, yyscan_t scanner)` */
 %lex-param {yyscan_t scanner}
 %parse-param {yyscan_t scanner}{AST_Block** program}
 
 %define parse.trace
 %define parse.error verbose
 
+/* Normal includes and declarations */
 %code requires {
 	#include <stdio.h>
 	#include "config.h"
@@ -15,10 +19,12 @@
 	void yyerror(yyscan_t scanner, AST_Block** program, char const* msg);
 }
 
+/* token_stream.h includes the generated header, so it must go last */
 %code provides {
 	#include "compiler/parser/token_stream.h"
 }
 
+/* All types used by tokens or non-terminals */
 %union {
 	char* ident;
 	Word num;
@@ -35,8 +41,10 @@
 	AST_ParamList* param_list;
 }
 
-%define api.token.prefix {TOK_}              /* Tokens start with TOK_ */
+/* All tokens are prefixed with "TOK_" for external usage */
+%define api.token.prefix {TOK_}
 
+/* Tokens this parser understands and their associated types (if any) */
 %token         NUL         1 "EOF"        /*!< End of file */
 %token <ident> IDENT       2 "IDENT"      /*!< An identifier (symbol), such as "myVar" */
 %token <num>   NUMBER      3 "NUMBER"     /*!< A numeric literal, such as "12345" */
@@ -69,6 +77,11 @@
 %token         PROCEDURE  30 "procedure"  /*!< The "proc" keyword */
 %token         WRITE      31 "write"      /*!< The "write" keyword */
 %token         READ       32 "read"       /*!< The "read" keyword */
+%token         ELSE       33 "else"       /*!< The "else" keyword */
+
+/* Fix "dangling else" ambiguity (shift/reduce conflict) */
+%precedence    THEN
+%precedence    ELSE
 
 %type <block> block
 %type <const_decls> const_decls const_decls_list
@@ -79,7 +92,7 @@
 %type <cond_op> cond_op
 %type <cond> cond
 %type <expr_op> expr_op term_op
-%type <expr> expr raw_expr term factor
+%type <expr> expr raw_expr negated_expr term negated_term factor negated_factor
 %type <param_list> params params_list
 
 %%
@@ -180,7 +193,9 @@ stmts
 
 stmt_if
 	: "if" cond "then" stmt
-		{ $$ = AST_Stmt_create(STMT_IF, $2, $4); }
+		{ $$ = AST_Stmt_create(STMT_IF, $2, $4, NULL); }
+	| "if" cond "then" stmt "else" stmt
+		{ $$ = AST_Stmt_create(STMT_IF, $2, $4, $6); }
 	;
 
 stmt_while
@@ -214,22 +229,31 @@ cond
 		{ $$ = AST_Cond_create($2, $1, $3); }
 	;
 
+expr
+	: "+" raw_expr
+		{ $$ = $2; }
+	| "-" negated_expr
+		{ $$ = $2; }
+	| raw_expr
+		{ $$ = $1; }
+	;
+
 expr_op
 	: "+" { $$ = EXPR_ADD; }
 	| "-" { $$ = EXPR_SUB; }
-	;
-
-expr
-	: expr_op raw_expr
-		{ $$ = AST_Expr_applyUnaryOperator($2, $1); }
-	| raw_expr
-		{ $$ = $1; }
 	;
 
 raw_expr
 	: term
 		{ $$ = $1; }
 	| term expr_op raw_expr
+		{ $$ = AST_Expr_create($2, $1, $3); }
+	;
+
+negated_expr
+	: negated_term
+		{ $$ = $1; }
+	| negated_term expr_op raw_expr
 		{ $$ = AST_Expr_create($2, $1, $3); }
 	;
 
@@ -245,6 +269,13 @@ term
 		{ $$ = AST_Expr_create($2, $1, $3); }
 	;
 
+negated_term
+	: negated_factor
+		{ $$ = $1; }
+	| negated_factor term_op term
+		{ $$ = AST_Expr_create($2, $1, $3); }
+	;
+
 factor
 	: IDENT
 		{ $$ = AST_Expr_create(EXPR_VAR, $1); }
@@ -256,6 +287,11 @@ factor
 		{ $$ = AST_Expr_create(EXPR_CALL, $2, NULL); }
 	| "call" IDENT "(" params ")"
 		{ $$ = AST_Expr_create(EXPR_CALL, $2, $4); }
+	;
+
+negated_factor
+	: factor
+		{ $$ = AST_Expr_create(EXPR_NEG, $1); }
 	;
 
 params

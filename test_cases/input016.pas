@@ -6,8 +6,7 @@ begin
 		/*{ Naive, slow, recursive method }*/
 		return := call Fibonacci(n - 1) + call Fibonacci(n - 2);
 	end
-	;/*else begin*/
-	if n <= 1 then begin
+	else begin
 		return := n;
 	end;
 end;

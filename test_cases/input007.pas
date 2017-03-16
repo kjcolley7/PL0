@@ -9,13 +9,11 @@ procedure A();
 		if x <> 0 then begin
 			write ZERO
 		end
-		;/*else begin*/
-		if x = 0 then begin
+		else begin
 			if x > 1 then begin
 				call A
 			end
-			;/*else begin*/
-			if x <= 1 then begin
+			else begin
 				write x
 			end
 		end;
@@ -24,8 +22,8 @@ procedure A();
 		
 		/*{ The next two conditions should disappear from mcode.txt }*/
 		if x > 0 then;
-		/*if x > 1 then else;*/
-		/*if x > 2 then else write x;*/
+		if x > 1 then else;
+		if x > 2 then else write x;
 		
 		write ONE;
 		
@@ -42,13 +40,11 @@ procedure A();
 			if x > 1 then begin
 				call A
 			end
-			;/*else begin*/
-			if x <= 1 then begin
+			else begin
 				write x
 			end
 		end
-		;/*else begin*/
-		if x = 0 then
+		else begin
 			write ZERO
 		end;;;;;;
 	end;
@@ -61,8 +57,7 @@ begin
 	if ZERO < ONE then begin
 		write ZERO
 	end
-	;/*else begin*/
-	if ZERO >= ONE then begin
+	else begin
 		write ONE
 	end
 end.
