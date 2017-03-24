@@ -1,1 +1,2 @@
-. */ /* Comment end token while not in comment */
+*/ /* Comment end token while not in comment */
+.
