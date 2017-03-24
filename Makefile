@@ -23,14 +23,14 @@ SRCS := $(wildcard *.c) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.c))
 # Object files that need to be produced from C sources
 OBJS := $(patsubst %,$(BUILD)/%.o,$(SRCS))
 
+# Bison parser generator input Y files
+BISON_FILES := $(wildcard compiler/parser/*.y)
+
 # Build with support for the Bison parser generator
 ifdef WITH_BISON
 
 # Set WITH_BISON macro for conditional compilation sections
 override CFLAGS += -DWITH_BISON=1
-
-# Bison parser generator input Y files
-BISON_FILES := $(wildcard compiler/parser/*.y)
 
 # Bison parser generator output C and H files
 BISON_C_FILES := $(patsubst %,$(GEN)/%.c,$(BISON_FILES))
@@ -66,7 +66,7 @@ BUILD_DIR_FILES := $(addsuffix /.dir,$(BUILD_DIRS))
 ## Archive variables
 
 # Name of archive file
-ZIP := pl0.zip
+ZIP := pl0_hw3.zip
 
 # Dot files produced during runtime that Graphviz should render
 GRAPH_DOTS := lexer.dot ast.dot unoptimized_cfg.dot cfg.dot
@@ -87,10 +87,10 @@ OUTPUTS := lexemetable.txt cleaninput.txt tokenlist.txt symboltable.txt mcode.tx
 DATA := input.txt $(OUTPUTS)
 
 # All required documentation files
-DOCS := PL0_Reference_Manual_Version_3.pdf PL0_Reference_Manual_Version_3.docx Scanner_and_Parser_Error.pdf
+DOCS := readme.txt hw3_correct.txt hw3_errors.txt
 
 # All resources that should be included in the archive
-RESOURCES := .gitignore Makefile README.md $(DOCS) $(DATA) $(TEST_CASES) $(SRCS) $(HEADERS)
+RESOURCES := .gitignore Makefile README.md $(DOCS) $(DATA) $(TEST_CASES) $(BISON_FILES) $(SRCS) $(HEADERS)
 
 
 ## Build settings
