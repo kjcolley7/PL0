@@ -10,7 +10,6 @@
 
 /* Normal includes and declarations */
 %code requires {
-	#include <stdio.h>
 	#include "config.h"
 	#include "compiler/ast_nodes.h"
 	
@@ -309,6 +308,8 @@ params_list
 	;
 
 %%
+
+#include <stdio.h>
 
 void yyerror(yyscan_t scanner, AST_Block** program, char const* msg) {
 	(void)scanner;
