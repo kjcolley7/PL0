@@ -51,6 +51,9 @@ int run_compiler(CompilerFiles* files) {
 		err = EXIT_FAILURE;
 	}
 	else {
+		/* Required for HW3 */
+		printf("Program is syntactically correct\n");
+		
 		/* Parser completed without syntax errors, now output AST graph */
 		Graphviz* gv = Graphviz_initWithFile(Graphviz_alloc(), files->ast, "AST");
 		AST_Block_drawGraph(prog, gv);
