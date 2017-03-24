@@ -68,8 +68,8 @@ int main(int argc, char* argv[]) {
 	for(i = 1; i < argc; i++) {
 		if(strcmp(argv[i], "--help") == 0) {
 			printf(
-				   "Usage: %s [-acdrstmv]\n"
-				   "  -t    Duplicate token list to stdout\n"
+				   "Usage: %s [-acdlrsmv]\n"
+				   "  -l    Duplicate token list to stdout\n"
 				   "  -s    Duplicate symbol table to stdout\n"
 				   "  -a    Duplicate disassembly to stdout\n"
 				   "  -v    Duplicate program trace to stdout\n"
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
 				   argv[0]);
 			return EXIT_SUCCESS;
 		}
-		else if(strcmp(argv[i], "-t") == 0) {
+		else if(strcmp(argv[i], "-l") == 0) {
 			opts |= OPT_TEE_TOKLIST;
 		}
 		else if(strcmp(argv[i], "-s") == 0) {
