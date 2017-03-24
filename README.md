@@ -25,6 +25,6 @@ After the PL/0 toolchain is built, simply run command `./pl0` to process `input.
 * `-a` The disassembled code
 * `-v` The virtual machine execution stack trace
 
-Beyond these flags, the compiler driver accepts the `-c` option to compile the source without running it and a `-r` option to run the code in `mcode.txt` without compiling any code. Additionally, the VM has a debugger built in, so running `./pl0 -d` will compile the source and run it in the VM in a debug mode.
+Beyond these flags, the compiler driver accepts the `-c` option to compile the source without running it and a `-r` option to run the code in `mcode.txt` without compiling any code. Additionally, the VM has a debugger built in, so running `./pl0 -d` will compile the source and run it in the VM in a debug mode. Finally, the `-p` option tells the compiler driver to pretty print the VM stack trace as Markdown.
 
 This compiler supports calling procedures with parameters and returning a functional value. Arrays are currently not supported.
