@@ -151,7 +151,7 @@ Token* Lexer_nextToken(Lexer* self) {
 				self->at_eof = true;
 				
 				/* Return nulsym as an indicator of EOF */
-				return Token_initWithType(Token_alloc(), nulsym, "", self->line_number);
+				return Token_initWithType(Token_alloc(), nulsym, "EOF", self->line_number);
 			}
 		}
 	}
