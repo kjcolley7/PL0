@@ -1,44 +1,50 @@
 #kMac:~/Projects/Xcode/PL0/PL0 (master)$ cat input.txt
 procedure BoxVolume(l, w, h);
-	begin
-		/*{ Ensure we can return a value from a procedure }*/
-		return := l * w * h;
-	end;
+  begin
+    /*{ Ensure we can return a value from a procedure }*/
+    return := l * w * h;
+  end;
 
 procedure WriteVolume(l, w, h);
-	begin
-		/*{ Ensure we can use "return" like a normal variable }*/
-		return := call BoxVolume(l, w, h);
-		write return;
-	end;
+  begin
+    /*{ Ensure we can use "return" like a normal variable }*/
+    return := call BoxVolume(l, w, h);
+    write return;
+  end;
 
 procedure Main();
-	const L = 7, W = 11, H = 13;
-	var volume;
-	begin
-		/*{ Ensure we can call a procedure with parameters as a statement }*/
-		call WriteVolume(2, 4, 7);
-		
-		/*{ Ensure we can use the return value of a procedure call with parameters }*/
-		volume := call BoxVolume(L, W, H);
-		write volume;
-		
-		/*{ Ensure we can use the return value of a procedure call in a condition }*/
-		if 2 * call BoxVolume(L, W, H) > 2000 then begin
-			/*{ Ensure we can use expressions as parameter values }*/
-			call WriteVolume(2 * L, W, H);
-		end
-		else begin
-			call WriteVolume(2000, 1, 1);
-		end;
-		
-		/*{ Ensure we can use the result of a procedure call within a parameter for another procedure call }*/
-		call WriteVolume(2, 3, 3 * call BoxVolume(3, 5, 4) - 173);
-	end;
+  const L = 7, W = 11, H = 13;
+  var volume;
+  begin
+    /*{ Ensure we can call a procedure with parameters as a statement }*/
+    call WriteVolume(2, 4, 7);
+    
+    /*{ Ensure we can use the return value of a procedure call with parameters }*/
+    volume := call BoxVolume(L, W, H);
+    write volume;
+    
+    /*{ Ensure we can use the return value of a procedure call in a condition }*/
+    if 2 * call BoxVolume(L, W, H) > 2000 then begin
+        /*{ Ensure we can use expressions as parameter values }*/
+      call WriteVolume(2 * L, W, H);
+    end
+    else begin
+      call WriteVolume(2000, 1, 1);
+    end;
+    
+    /*{ Ensure we can use the result of a procedure call within a parameter for another procedure call }*/
+    call WriteVolume(2, 3, 3 * call BoxVolume(3, 5, 4) - 173);
+  end;
 
 /*{ Ensure we can still call a procedure without parameters without parentheses as a statement }*/
 call Main.
+
+
+
+
+
 #kMac:~/Projects/Xcode/PL0/PL0 (master)$ ./pl0 -m -v
+Program is syntactically correct
 5 0 2
 9 0 3
 6 0 5
@@ -269,5 +275,3 @@ Initial values                     0       1       0
   74     OPR       0       0      62       1       5  | 0 1 1 1 1001
   62     OPR       0       0       1       1       0  
    1     SIO       0       3       0       0       0  
-#kMac:~/Projects/Xcode/PL0/PL0 (master)$ echo $?
-0
