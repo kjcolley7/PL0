@@ -32,11 +32,7 @@ int run_compiler(CompilerFiles* files, PARSER_TYPE parserType, CODEGEN_TYPE code
 	int err = EXIT_SUCCESS;
 	
 	/* Allocate and initialize PL/0 parser object */
-	FILE* input_fp = fopen("input.txt", "r");
-	if(!input_fp) {
-		perror("input.txt");
-		return EXIT_FAILURE;
-	}
+	FILE* input_fp = fopen_ff("input.txt", "r");
 	Lexer* lexer = PL0Lexer_initWithFile(Lexer_alloc(), input_fp);
 	Parser* parser = Parser_initWithLexer(Parser_alloc(), lexer, parserType);
 	
@@ -48,9 +44,6 @@ int run_compiler(CompilerFiles* files, PARSER_TYPE parserType, CODEGEN_TYPE code
 		err = EXIT_FAILURE;
 	}
 	else {
-		/* Required for HW3 */
-		printf("Program is syntactically correct\n");
-		
 		/* Parser completed without syntax errors, now output AST graph */
 		Graphviz* gv = Graphviz_initWithFile(Graphviz_alloc(), files->ast, "AST");
 		AST_Block_drawGraph(prog, gv);

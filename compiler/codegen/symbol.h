@@ -20,7 +20,7 @@ typedef struct Symbol Symbol;
 typedef enum SYM_TYPE SYM_TYPE;
 
 #include "object.h"
-#include "block.h"
+#include "compiler/codegen/pm0/block.h"
 #include "config.h"
 
 enum SYM_TYPE {

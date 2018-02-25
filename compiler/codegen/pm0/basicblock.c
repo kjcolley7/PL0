@@ -298,6 +298,7 @@ static void BasicBlock_genTail(BasicBlock* self, uint16_t level) {
 	}
 	
 	/* Starting the tail, so mark the position */
+	self->flags |= BB_HAS_TAIL;
 	self->tail_index = self->insns.count;
 	
 	/* Instruction used to end execution in this procedure */

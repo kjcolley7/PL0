@@ -249,18 +249,18 @@ static inline void _expand_array(void** parr, size_t elem_size, void* pcap, size
 } while(0)
 
 /*! Helper macro for inserting an element into a dynamic array */
-#define insert_element(parr, index, elem) do { \
+#define insert_element(parr, index, pelem) do { \
 	__typeof__(parr) _insert_element_parr = (parr); \
 	expand_if_full(_insert_element_parr); \
-	insert_element_array(_insert_element_parr->elems, index, elem, _insert_element_parr->count++); \
+	insert_element_array(_insert_element_parr->elems, index, pelem, _insert_element_parr->count++); \
 } while(0)
-#define insert_element_array(arr, index, elem, count) \
-insert_index_array(arr, sizeof(*(arr)), index, elem, count)
+#define insert_element_array(arr, index, pelem, count) \
+insert_index_array(arr, sizeof(*(arr)), index, pelem, count)
 static inline void insert_index_array(
 	void* arr,
 	size_t elem_size,
 	size_t index,
-	const void* elem,
+	const void* pelem,
 	size_t count
 ) {
 	/* Move from the target position */
@@ -268,7 +268,7 @@ static inline void insert_index_array(
 	void* dst = (char*)target + elem_size;
 	size_t move_size = (count - index) * elem_size;
 	memmove(dst, target, move_size);
-	memcpy(target, elem, elem_size);
+	memcpy(target, pelem, elem_size);
 }
 
 /*! Helper macro for removing an element from a dynamic array by its pointer */

@@ -217,7 +217,8 @@ static bool SymTree_addSymbol(SymTree* self, Symbol* sym) {
 	}
 	
 	/* Insert the symbol into its position */
-	insert_element(&self->syms, lo, retain(sym));
+	retain(sym);
+	insert_element(&self->syms, lo, &sym);
 	return true;
 }
 
