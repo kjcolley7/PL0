@@ -12,13 +12,11 @@
 Destroyer(GVNode) {
 	destroy(&self->node_id);
 	
-	size_t i;
-	for(i = 0; i < self->attr_count; i++) {
-		destroy(&self->attr_names[i]);
-		destroy(&self->attr_values[i]);
+	foreach(&self->attrs, attr) {
+		destroy(&attr->name);
+		destroy(&attr->value);
 	}
-	destroy(&self->attr_names);
-	destroy(&self->attr_values);
+	clear_array(&self->attrs);
 }
 DEF(GVNode);
 
@@ -52,33 +50,27 @@ void GVNode_addAttribute(GVNode* self, const char* attrib, const char* value, ..
 	});
 }
 void GVNode_vAddAttribute(GVNode* self, const char* attrib, const char* value, va_list ap) {
-	if(self->attr_count == self->attr_cap) {
-		size_t old_cap = self->attr_cap;
-		expand(&self->attr_names, &old_cap);
-		expand(&self->attr_values, &self->attr_cap);
-	}
-	
-	self->attr_names[self->attr_count] = html_str(attrib);
-	vasprintf_ff(&self->attr_values[self->attr_count++], value, ap);
+	element_type(self->attrs) attr;
+	attr.name = html_str(attrib);
+	attr.value = vrsprintf_ff(value, ap);
+	append(&self->attrs, attr);
 }
 
 void GVNode_draw(GVNode* self, Graphviz* gv) {
-	if(self->attr_count == 0) {
+	if(self->attrs.count == 0) {
 		/* Is this necessary? */
 		Graphviz_draw(gv, "<%s>;", self->node_id);
 		return;
 	}
 	
 	char* attrs = NULL;
-	size_t i;
-	for(i = 0; i < self->attr_count; i++) {
+	foreach(&self->attrs, attr) {
 		const char* prefix = "";
 		if(attrs != NULL) {
 			prefix = ", ";
 		}
 		
-		char* next;
-		asprintf_ff(&next, "%s%s%s=%s", attrs ?: "", prefix, self->attr_names[i], self->attr_values[i]);
+		char* next = rsprintf_ff("%s%s%s=%s", attrs ?: "", prefix, attr->name, attr->value);
 		destroy(&attrs);
 		attrs = next;
 	}

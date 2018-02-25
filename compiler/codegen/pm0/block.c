@@ -11,7 +11,7 @@
 #include "gvnode.h"
 
 
-static Word Block_getCodeLength(Block* self);
+static size_t Block_getCodeLength(Block* self);
 static void Block_resolve(Block* self);
 static Block* Block_getLast(Block* self);
 static void Block_setNext(Block* self, Block* next);
@@ -33,19 +33,18 @@ Block* Block_initWithScope(Block* self, SymTree* symtree) {
 
 bool Block_generate(Block* self, AST_Block* ast) {
 	if(ast->procs != NULL) {
-		size_t i;
-		for(i = 0; i < ast->procs->proc_count; i++) {
+		foreach(&ast->procs->procs, pproc) {
 			/* Generate the code for all subprocedures of this procedure */
-			AST_Proc* proc = ast->procs->procs[i];
-			Symbol* sym = SymTree_findSymbol(self->symtree, proc->ident);
-			if(!Block_generate(sym->value.procedure.body, proc->body)) {
+			Symbol* sym = SymTree_findSymbol(self->symtree, (*pproc)->ident);
+			if(!Block_generate(sym->value.procedure.body, (*pproc)->body)) {
 				return false;
 			}
 		}
 	}
 	
-	/* Generate the code for this block */
-	return GenPM0_genBlock(self, ast);
+	/* Generate the code for this block into a new empty basic block */
+	self->code = BasicBlock_new();
+	return GenPM0_genBlock(self->symtree, &self->code, ast);
 }
 
 void Block_optimize(Block* self) {
@@ -97,8 +96,8 @@ void Block_setAddress(Block* self, Word addr) {
 	Block_resolve(self);
 }
 
-static Word Block_getCodeLength(Block* self) {
-	Word length = 0;
+static size_t Block_getCodeLength(Block* self) {
+	size_t length = 0;
 	BasicBlock* cur = self->code;
 	while(cur != NULL) {
 		length += BasicBlock_getInstructionCount(cur);
@@ -127,8 +126,8 @@ static Block* Block_getLast(Block* self) {
 }
 
 static void Block_setNext(Block* self, Block* next) {
-	assert(self->next == NULL);
-	Block_setAddress(next, Block_getAddress(self) + self->code_length);
+	ASSERT(self->next == NULL);
+	Block_setAddress(next, Block_getAddress(self) + (Word)self->code_length);
 	self->last = self->next = next;
 }
 

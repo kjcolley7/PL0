@@ -13,6 +13,8 @@ typedef struct GenPM0 GenPM0;
 
 #include "object.h"
 #include "block.h"
+#include "basicblock.h"
+#include "compiler/codegen/symtree.h"
 #include "compiler/ast_nodes.h"
 
 struct GenPM0 {
@@ -45,11 +47,12 @@ void GenPM0_writeSymbolTable(GenPM0* self, FILE* fp);
 void GenPM0_emit(GenPM0* self, FILE* fp);
 
 /*! Generate code for the block given its AST node
- @param scope Block containing the one being codegenned
+ @param scope SymTree node for the block being codegenned
+ @param code Active basic block where code should be generated
  @param ast AST node for the block to codegen
  @return True on success, false on failure
  */
-bool GenPM0_genBlock(Block* scope, AST_Block* ast);
+bool GenPM0_genBlock(SymTree* scope, BasicBlock** code, AST_Block* ast);
 
 
 #endif /* PL0_GENPM0_H */

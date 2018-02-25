@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
-#include "object.h"
+#include "macros.h"
 
 /* Data structure passed to custom file operation functions */
 struct tee_cookie {

@@ -3,8 +3,9 @@ TARGET := pl0
 
 # Compiler flags to use
 override CFLAGS += -D_GNU_SOURCE=1 -Wall -Wextra -Wno-unused-function -Werror -I.
-override OFLAGS += -O2
+override OFLAGS += -O2 -flto
 override LDFLAGS +=
+override STRIP_FLAGS += -Wl,-S -Wl,-x
 override YFLAGS += -Wall -Werror
 
 
@@ -25,9 +26,6 @@ SRC_DIRS := \
 
 # If we are building with support for LLVM code generation
 ifdef WITH_LLVM
-
-# Set WITH_LLVM macro for conditional compilation sections
-override CFLAGS += -DWITH_LLVM=1
 
 # Add the LLVM sources
 SRC_DIRS := $(SRC_DIRS) compiler/codegen-llvm
@@ -52,9 +50,6 @@ BISON_FILES := $(call find_srcs,y)
 
 # Build with support for the Bison parser generator
 ifdef WITH_BISON
-
-# Set WITH_BISON macro for conditional compilation sections
-override CFLAGS += -DWITH_BISON=1
 
 # Bison parser generator output C and H files
 BISON_C_FILES := $(patsubst %,$(GEN)/%.c,$(BISON_FILES))
@@ -118,16 +113,24 @@ RESOURCES := .gitignore Makefile README.md $(DATA) $(TEST_CASES) $(BISON_FILES) 
 
 # Compiler choices
 GCC := gcc
+G++ := g++
+
 CLANG := clang
+CLANG++ := clang++
+
 BISON := bison
 
 # Compilers and linker to use
 ifdef USE_GCC
 CC := $(GCC)
+CXX := $(G++)
 LD := $(GCC)
+LD++ := $(G++)
 else #USE_GCC
 CC := $(CLANG)
+CXX := $(CLANG++)
 LD := $(CLANG)
+LD++ := $(CLANG++)
 endif #USE_GCC
 
 # Parser generator to use
@@ -179,6 +182,7 @@ all: $(TARGET)
 # Build in debug mode (with asserts enabled)
 debug: override CFLAGS += -ggdb -DDEBUG=1 -UNDEBUG
 debug: override OFLAGS := -O0
+debug: override STRIP_FLAGS :=
 debug: $(TARGET)
 
 # Uses clang's Address Sanitizer to help detect memory errors
@@ -192,7 +196,7 @@ debug+: debug
 # Linking rule
 $(TARGET): $(OBJS)
 	@echo 'Linking $@'
-	$(_v)$(LD) $(LDFLAGS) -o $@ $^
+	$(_v)$(LD) $(LDFLAGS) $(OFLAGS) $(STRIP_FLAGS) -o $@ $^
 
 # Compiling rule for C sources
 $(BUILD)/%.c.o: %.c | $(BUILD_DIR_FILES) $(PRE_CC)

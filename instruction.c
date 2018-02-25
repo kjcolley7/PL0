@@ -12,7 +12,7 @@
 
 
 static const char* op_str[16] = {
-	NULL,
+	"BREAK",
 	"LIT",
 	"OPR",
 	"LOD",
@@ -94,7 +94,7 @@ const char* Insn_getMnemonic(Insn insn) {
 				case 1: return "WRITE";
 				case 2: return "READ";
 				case 3: return "HALT";
-				default: abort();
+				default: return "SIO ?";
 			}
 			break;
 		
@@ -114,10 +114,11 @@ const char* Insn_getMnemonic(Insn insn) {
 				case ALU_LEQ: return "LEQ";
 				case ALU_GTR: return "GTR";
 				case ALU_GEQ: return "GEQ";
-				default: abort();
+				default: return "OPR ?";
 			}
-		
-		default: abort();
+			
+		/* Stupid trigraphs... */
+		default: return "?""?""?";
 	}
 }
 
@@ -135,7 +136,7 @@ static const char* Insn_getPrettyMnemonic(Insn insn) {
 				case 1: return "<font color=\"" IO_COLOR "\">WRITE</font>";
 				case 2: return "<font color=\"" IO_COLOR "\">READ</font> ";
 				case 3: return "<font color=\"" RET_COLOR "\">HALT</font> ";
-				default: abort();
+				default: return "<font color=\"" ERR_COLOR "\">SIO ?</font>";
 			}
 			break;
 		
@@ -155,10 +156,11 @@ static const char* Insn_getPrettyMnemonic(Insn insn) {
 				case ALU_LEQ: return "<font color=\"" COND_COLOR "\">LEQ</font>  ";
 				case ALU_GTR: return "<font color=\"" COND_COLOR "\">GTR</font>  ";
 				case ALU_GEQ: return "<font color=\"" COND_COLOR "\">GEQ</font>  ";
-				default: abort();
+				default: return "<font color=\"" ERR_COLOR "\">OPR ?</font>";
 			}
-		
-		default: abort();
+			
+		/* Stupid trigraphs... */
+		default: return "<font color=\"" ERR_COLOR "\">?""?""?</font>  ";
 	}
 }
 

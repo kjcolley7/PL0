@@ -8,6 +8,7 @@
 
 #include "machine.h"
 #include <string.h>
+#include <stdbool.h>
 #include <setjmp.h>
 #include <signal.h>
 #include "object.h"
@@ -103,7 +104,7 @@ static void interrupt_handler(int sig) {
 
 
 Destroyer(Machine) {
-	destroy(&self->bps);
+	destroy(&self->bps.elems);
 }
 DEF(Machine);
 
@@ -171,11 +172,11 @@ int Machine_loadCode(Machine* self, FILE* fp) {
 	
 	/* Disassemble instructions in code memory to the rest of the string table */
 	if(!dis_program(
-		&self->codelines[2][0],
-		DIS_LINE_LENGTH,
-		self->insn_count,
-		&self->codemem[0],
-		self->sep)) {
+			&self->codelines[2][0],
+			DIS_LINE_LENGTH,
+			self->insn_count,
+			&self->codemem[0],
+			self->sep)) {
 		return -1;
 	}
 	
@@ -206,7 +207,7 @@ static void Machine_fetch(Machine* self, jmp_buf jmp) {
 		/* If the instruction is a breakpoint, fetch the original instruction instead */
 		if(IS_BREAK(cur) && Machine_breakpointExists(self, cur.imm)) {
 			/* Use the original instruction as the instruction to execute */
-			IR = self->bps[cur.imm].orig;
+			IR = self->bps.elems[cur.imm].orig;
 			return;
 		}
 		self->isResuming = false;
@@ -222,10 +223,8 @@ static void Machine_execute(Machine* self, jmp_buf jmp) {
 			/* Can be used by the compiler to insert a breakpoint */
 			if(IR.lvl != 0) {
 				/* BREAK instructions with L=1 are created by a debugger */
-				if(IR.lvl == 1) {
-					/* This shouldn't be possible as the bp should be caught before execute */
-					abort();
-				}
+				/* This shouldn't be possible as the bp should be caught before execute */
+				ASSERT(IR.lvl != 1);
 				
 				longjmp(jmp, STATUS_PAUSED);
 			}
@@ -256,7 +255,7 @@ static void Machine_execute(Machine* self, jmp_buf jmp) {
 			STACK(SP + 4) = PC;
 			BP = SP + 1;
 			PC = IR.imm;
-			assert(self->framecount < MAX_LEXI_LEVELS);
+			ASSERT(self->framecount < MAX_LEXI_LEVELS);
 			self->frames[self->framecount++] = BP;
 			break;
 			
@@ -300,12 +299,14 @@ static void Machine_execute(Machine* self, jmp_buf jmp) {
 					break;
 				
 				default:
-					abort();
+					runtimeError("Unknown SIO instruction: SIO %d", IR.imm);
+					longjmp(jmp, STATUS_ERROR);
 			}
 			break;
 			
 		default:
-			abort();
+			runtimeError("Unknown instruction: %d", IR.op);
+			longjmp(jmp, STATUS_ERROR);
 	}
 }
 
@@ -343,6 +344,10 @@ static void Machine_execALU(Machine* self, jmp_buf jmp) {
 				runtimeError("Tried to divide by zero!");
 				longjmp(jmp, STATUS_ERROR);
 			}
+			if(TOP == WORD_MIN && POPPED == -1) {
+				runtimeError("Tried to divide WORD_MIN by -1!");
+				longjmp(jmp, STATUS_ERROR);
+			}
 			TOP /= POPPED;
 			break;
 			
@@ -354,6 +359,10 @@ static void Machine_execALU(Machine* self, jmp_buf jmp) {
 			POP();
 			if(POPPED == 0) {
 				runtimeError("Tried to mod by zero!");
+				longjmp(jmp, STATUS_ERROR);
+			}
+			if(TOP == WORD_MIN && POPPED == -1) {
+				runtimeError("Tried to mod WORD_MIN by -1!");
 				longjmp(jmp, STATUS_ERROR);
 			}
 			TOP %= POPPED;
@@ -390,7 +399,8 @@ static void Machine_execALU(Machine* self, jmp_buf jmp) {
 			break;
 			
 		default:
-			abort();
+			runtimeError("Unknown OPR instruction: OPR %d", IR.imm);
+			longjmp(jmp, STATUS_ERROR);
 	}
 }
 
@@ -416,7 +426,7 @@ static void Machine_runOne(Machine* self) {
 		}
 		
 		/* Use original IR so that a debugger can print the real instruction */
-		IR = self->bps[IR.imm].orig;
+		IR = self->bps.elems[IR.imm].orig;
 		
 		/* Stop fetching and set the state to paused */
 		self->status = STATUS_PAUSED;
@@ -427,7 +437,7 @@ static void Machine_runOne(Machine* self) {
 	++PC;
 	
 	/* Create a jump target in case an interrupt signal is received */
-	if(sigsetjmp(intjmp, 1) == 0) {
+	if(sigsetjmp(intjmp, true) == 0) {
 		/* Setup signal handler to catch ^C */
 		signal(SIGINT, &interrupt_handler);
 	}
@@ -578,22 +588,20 @@ int Machine_addBreakpoint(Machine* self, Word addr) {
 	}
 	
 	/* Expand breakpoint array if necessary */
-	if(self->bp_count == self->bp_cap) {
-		expand(&self->bps, &self->bp_cap);
-	}
+	expand_if_full(&self->bps);
 	
 	/* Save breakpoint information */
-	self->bps[self->bp_count] = (Breakpoint){addr, self->codemem[addr], true};
+	self->bps.elems[self->bps.count] = (Breakpoint){addr, self->codemem[addr], true};
 	
 	/* Replace real instruction with breakpoint instruction */
-	self->codemem[addr] = MAKE_BREAK((int)self->bp_count);
+	self->codemem[addr] = MAKE_BREAK((int)self->bps.count);
 	
 	/* Return breakpoint ID */
-	return (int)self->bp_count++;
+	return (int)self->bps.count++;
 }
 
 bool Machine_breakpointExists(Machine* self, int bpid) {
-	return bpid >= 0 && bpid < (int)self->bp_count;
+	return bpid >= 0 && bpid < (int)self->bps.count;
 }
 
 void Machine_disableBreakpoint(Machine* self, int bpid) {
@@ -603,7 +611,7 @@ void Machine_disableBreakpoint(Machine* self, int bpid) {
 	}
 	
 	/* Lookup breakpoint */
-	Breakpoint* bp = &self->bps[bpid];
+	Breakpoint* bp = &self->bps.elems[bpid];
 	
 	/* Already disabled? */
 	if(!bp->enabled) {
@@ -614,7 +622,7 @@ void Machine_disableBreakpoint(Machine* self, int bpid) {
 	self->codemem[bp->addr] = bp->orig;
 	
 	/* Mark breakpoint as disabled */
-	self->bps[bpid].enabled = false;
+	self->bps.elems[bpid].enabled = false;
 }
 
 void Machine_enableBreakpoint(Machine* self, int bpid) {
@@ -624,7 +632,7 @@ void Machine_enableBreakpoint(Machine* self, int bpid) {
 	}
 	
 	/* Lookup breakpoint */
-	Breakpoint* bp = &self->bps[bpid];
+	Breakpoint* bp = &self->bps.elems[bpid];
 	
 	/* Already enabled? */
 	if(bp->enabled) {
@@ -635,7 +643,7 @@ void Machine_enableBreakpoint(Machine* self, int bpid) {
 	self->codemem[bp->addr] = MAKE_BREAK(bpid);
 	
 	/* Mark breakpoint as enabled */
-	self->bps[bpid].enabled = true;
+	self->bps.elems[bpid].enabled = true;
 }
 
 bool Machine_toggleBreakpoint(Machine* self, int bpid) {
@@ -645,7 +653,7 @@ bool Machine_toggleBreakpoint(Machine* self, int bpid) {
 	}
 	
 	/* Toggle breakpoint */
-	bool enabled = self->bps[bpid].enabled;
+	bool enabled = self->bps.elems[bpid].enabled;
 	if(enabled) {
 		Machine_disableBreakpoint(self, bpid);
 	}
@@ -660,14 +668,14 @@ bool Machine_toggleBreakpoint(Machine* self, int bpid) {
 void Machine_clearBreakpoints(Machine* self) {
 	/* Disable all breakpoints */
 	size_t i;
-	for(i = 0; i < self->bp_count; i++) {
+	for(i = 0; i < self->bps.count; i++) {
 		Machine_disableBreakpoint(self, (unsigned)i);
 	}
 	
 	/* Destroy the breakpoint array */
-	self->bp_count = 0;
-	self->bp_cap = 0;
-	destroy(&self->bps);
+	self->bps.count = 0;
+	self->bps.cap = 0;
+	destroy(&self->bps.elems);
 }
 
 void Machine_printStack(Machine* self, FILE* fp) {
@@ -694,7 +702,7 @@ void Machine_printState(Machine* self, FILE* fp) {
 		case STATUS_RUNNING: status = "RUNNING"; break;
 		case STATUS_HALTED:  status = "HALTED"; break;
 		case STATUS_ERROR:   status = "ERROR"; break;
-		default: abort();
+		default: ASSERT(!"Unknown machine status");
 	}
 	printf("Status: %s\n", status);
 	

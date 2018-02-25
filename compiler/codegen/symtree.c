@@ -35,16 +35,8 @@ static int compare_sym(const void* a, const void* b);
 
 
 Destroyer(SymTree) {
-	size_t i;
-	for(i = 0; i < self->child_count; i++) {
-		release(&self->children[i]);
-	}
-	destroy(&self->children);
-	
-	for(i = 0; i < self->sym_count; i++) {
-		release(&self->syms[i]);
-	}
-	destroy(&self->syms);
+	release_array(&self->children);
+	release_array(&self->syms);
 }
 DEF(SymTree);
 
@@ -97,16 +89,15 @@ static bool SymTree_addConsts(SymTree* self, AST_ConstDecls* decls) {
 	
 	/* Iterate through each declaration and add a new symbol into the table */
 	bool success = true;
-	size_t i;
-	for(i = 0; i < decls->const_count; i++) {
+	foreach(&decls->consts, pconst) {
 		/* Create a new symbol for the constant */
 		Symbol* sym = Symbol_new();
 		sym->type = SYM_CONST;
-		sym->name = strdup_ff(decls->idents[i]);
+		sym->name = strdup_ff(pconst->ident);
 		sym->level = self->level;
 		
 		/* Set the constant's numeric value */
-		sym->value.number = decls->values[i];
+		sym->value.number = pconst->value;
 		
 		/* Add the constant symbol to the current level of the tree */
 		success = SymTree_addSymbol(self, sym);
@@ -124,12 +115,11 @@ static bool SymTree_addVars(SymTree* self, AST_VarDecls* decls) {
 	
 	/* Iterate through each declaration and add a new symbol into the table */
 	bool success = true;
-	size_t i;
-	for(i = 0; i < decls->var_count; i++) {
+	foreach(&decls->vars, pvar) {
 		/* Create a new symbol for the variable */
 		Symbol* sym = Symbol_new();
 		sym->type = SYM_VAR;
-		sym->name = strdup_ff(decls->vars[i]);
+		sym->name = strdup_ff(*pvar);
 		sym->level = self->level;
 		
 		/* Set the variable's local stack offset and increment the offset */
@@ -151,46 +141,49 @@ static bool SymTree_addProcs(SymTree* self, AST_ProcDecls* decls) {
 	
 	/* Iterate through each declaration and add a new symbol into the table */
 	bool success = true;
-	size_t i, j;
-	for(i = 0; i < decls->proc_count; i++) {
+	foreach(&decls->procs, pproc) {
 		/* Create a new symbol for the procedure */
-		Symbol* sym = Symbol_new();
-		AST_Proc* proc = decls->procs[i];
-		sym->type = SYM_PROC;
-		sym->name = strdup_ff(proc->ident);
-		sym->level = self->level;
+		Symbol* symProc = Symbol_new();
+		symProc->type = SYM_PROC;
+		symProc->name = strdup_ff((*pproc)->ident);
+		symProc->level = self->level;
 		
 		/* Create the child symtrees */
-		SymTree* child = SymTree_initWithAST(SymTree_alloc(), self, proc->body, self->level + 1);
+		SymTree* child = SymTree_initWithAST(SymTree_alloc(), self, (*pproc)->body, self->level + 1);
 		
 		/* Set the parameter count */
-		size_t param_count = proc->param_decls ? proc->param_decls->param_count : 0;
-		sym->value.procedure.param_count = param_count;
+		size_t param_count = (*pproc)->param_decls ? (*pproc)->param_decls->params.count : 0;
+		symProc->value.procedure.param_count = param_count;
 		
-		/* Add variables for all the parameters */
-		for(j = 0; j < param_count; j++) {
-			/* Create new parameter symbol for each param */
-			Symbol* param = Symbol_new();
-			param->type = SYM_VAR;
-			param->name = strdup_ff(proc->param_decls->params[j]);
-			param->level = child->level;
-			param->value.frame_offset = child->frame_size++;
-			
-			/* Try to add the parameter into the Tree node */
-			success = SymTree_addSymbol(child, param);
-			release(&param);
-			if(!success) {
-				release(&sym);
-				return false;
+		if(param_count != 0) {
+			/* Add variables for all the parameters */
+			foreach(&(*pproc)->param_decls->params, pparam) {
+				/* Create new parameter symbol for each param */
+				Symbol* symParam = Symbol_new();
+				symParam->type = SYM_VAR;
+				symParam->name = strdup_ff(*pparam);
+				symParam->level = child->level;
+				symParam->value.frame_offset = child->frame_size++;
+				
+				/* Try to add the parameter into the Tree node */
+				success = SymTree_addSymbol(child, symParam);
+				
+				/* The child SymTree now holds a reference to symParam, so release ours */
+				release(&symParam);
+				
+				if(!success) {
+					release(&symProc);
+					return false;
+				}
 			}
 		}
 		
 		/* Create the block */
-		sym->value.procedure.body = Block_initWithScope(Block_alloc(), child);
+		symProc->value.procedure.body = Block_initWithScope(Block_alloc(), child);
 		
 		/* Need to add the symbol before codegen-ing its block to handle recursion */
-		success = SymTree_addSymbol(self, sym);
-		release(&sym);
+		success = SymTree_addSymbol(self, symProc);
+		release(&symProc);
 	}
 	
 	return success;
@@ -203,18 +196,13 @@ static int compare_sym(const void* key, const void* elem) {
 }
 
 static bool SymTree_addSymbol(SymTree* self, Symbol* sym) {
-	/* Check to see if the array has hit its capacity */
-	if(self->sym_count == self->sym_cap) {
-		expand(&self->syms, &self->sym_cap);
-	}
-	
 	/* Have to manually bsearch to find the place to insert the symbol */
-	size_t lo = 0, hi = self->sym_count;
+	size_t lo = 0, hi = self->syms.count;
 	while(lo < hi) {
 		size_t mid = lo + (hi - lo) / 2;
 		
 		/* Determine where the symbol should go in relation to the middle element */
-		int diff = compare_sym(sym->name, &self->syms[mid]);
+		int diff = compare_sym(sym->name, &self->syms.elems[mid]);
 		if(diff < 0) {
 			/* Not mid - 1 because we want to insert before hi */
 			hi = mid;
@@ -229,8 +217,7 @@ static bool SymTree_addSymbol(SymTree* self, Symbol* sym) {
 	}
 	
 	/* Insert the symbol into its position */
-	Symbol* ref = retain(sym);
-	insert_element(self->syms, lo, &ref, self->sym_count++);
+	insert_element(&self->syms, lo, retain(sym));
 	return true;
 }
 
@@ -239,13 +226,8 @@ void SymTree_addChild(SymTree* self, SymTree* child) {
 		return;
 	}
 	
-	/* Check to see if the array has hit its capacity */
-	if(self->child_count == self->child_cap) {
-		expand(&self->children, &self->child_cap);
-	}
-	
 	/* Add the child into the array of children */
-	self->children[self->child_count++] = child;
+	append(&self->children, child);
 	
 	/* Give the child a pointer to its parent */
 	child->parent = self;
@@ -258,7 +240,8 @@ Symbol* SymTree_findSymbol(SymTree* self, const char* name) {
 	}
 	
 	/* Binary search through the symbol array and see if it contains our symbol */
-	Symbol** psym = bsearch(name, self->syms, self->sym_count, sizeof(*self->syms), &compare_sym);
+	Symbol** psym = bsearch(name,
+		self->syms.elems, self->syms.count, element_size(self->syms), &compare_sym);
 	if(psym != NULL) {
 		return *psym;
 	}
@@ -273,27 +256,23 @@ void SymTree_write(SymTree* self, FILE* fp) {
 	}
 	
 	/* Write all the symbols in the current level of the symbol tree */
-	size_t i;
-	for(i = 0; i < self->sym_count; i++) {
-		Symbol_write(self->syms[i], fp);
+	foreach(&self->syms, psym) {
+		Symbol_write(*psym, fp);
 	}
 	
 	/* Write all the symbols in each of the child nodes */
-	for(i = 0; i < self->child_count; i++) {
-		SymTree_write(self->children[i], fp);
+	foreach(&self->children, pchild) {
+		SymTree_write(*pchild, fp);
 	}
 }
 
 void SymTree_drawProcs(SymTree* self, Graphviz* gv) {
-	size_t i;
-	for(i = 0; i < self->sym_count; i++) {
-		Symbol* sym = self->syms[i];
-		
+	foreach(&self->syms, psym) {
 		/* Only draw procedures */
-		if(sym->type == SYM_PROC) {
+		if((*psym)->type == SYM_PROC) {
 			/* Create subgraph for this procedure */
-			Graphviz* proc = Graphviz_initWithParentGraph(
-				Graphviz_alloc(), gv, "cluster_%s", sym->name);
+			Graphviz* proc = Graphviz_initWithParentGraph(Graphviz_alloc(),
+				gv, "cluster_%s", (*psym)->name);
 			
 			/* Graph's outline color is blue and the font for the procedure name is Courier */
 			Graphviz_draw(proc, "color=blue;");
@@ -302,10 +281,10 @@ void SymTree_drawProcs(SymTree* self, Graphviz* gv) {
 			/* Draw name of procedure and its param count */
 			Graphviz_draw(proc,
 				"label=<<font color=\"" CAL_COLOR "\">%s</font> (%zu parameters)>;",
-				sym->name, sym->value.procedure.param_count);
+				(*psym)->name, (*psym)->value.procedure.param_count);
 			
 			/* Draw the code graph */
-			Block_drawGraph(self->syms[i]->value.procedure.body, proc);
+			Block_drawGraph((*psym)->value.procedure.body, proc);
 			release(&proc);
 		}
 	}

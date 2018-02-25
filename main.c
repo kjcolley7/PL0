@@ -38,16 +38,6 @@ static const char* const acode_txt = "acode.txt";
 static const char* const stacktrace_txt = "stacktrace.txt";
 
 
-static FILE* check_fopen(const char* fname, const char* mode) {
-	FILE* ret = fopen(fname, mode);
-	if(ret == NULL) {
-		perror(fname);
-		exit(EXIT_FAILURE);
-	}
-	return ret;
-}
-
-
 /* Command line argument option flags */
 #define OPT_TEE_TOKLIST   (1<<0)
 #define OPT_TEE_SYMTAB    (1<<1)
@@ -102,22 +92,28 @@ int main(int argc, char* argv[]) {
 		ARG(0, "parser=rdp", "Use the recursive descent parser (default)") {
 			parserType = PARSER_RDP;
 		}
-#if WITH_BISON
 		ARG(0, "parser=bison", "Use the Bison-generated parser") {
+#if WITH_BISON
 			parserType = PARSER_BISON;
-		}
+#else /* WITH_BISON */
+			printf("This program must be built using WITH_BISON=1 to use the Bison parser\n");
+			return EXIT_FAILURE;
 #endif /* WITH_BISON */
+		}
 		ARG(0, "codegen=pm0", "Use the PM/0 code generator (default)") {
 			codegenType = CODEGEN_PM0;
 		}
-#if WITH_LLVM
 		ARG(0, "codegen=llvm", "Use the LLVM code generator") {
+#if WITH_LLVM
 			codegenType = CODEGEN_LLVM;
-		}
+#else /* WITH_LLVM */
+			printf("This program must be built using WITH_LLVM=1 to use the LLVM code generator\n");
+			return EXIT_FAILURE;
 #endif /* WITH_LLVM */
+		}
 	}
 	
-	if((opts & OPT_SKIP_COMPILE) && (opts & OPT_SKIP_RUN)) {
+	if(HAS_ALL_FLAGS(opts, OPT_SKIP_COMPILE | OPT_SKIP_RUN)) {
 		printf("The -c and -r options cannot be combined because there would be nothing left to do\n");
 		return EXIT_FAILURE;
 	}
@@ -126,15 +122,15 @@ int main(int argc, char* argv[]) {
 	if(!(opts & OPT_SKIP_COMPILE)) {
 		/* Create an object used to store the lexer's files */
 		LexerFiles* lexerFiles = LexerFiles_new();
-		lexerFiles->input = check_fopen(input_txt, "r");
-		lexerFiles->table = check_fopen(lexemetable_txt, "w");
-		lexerFiles->clean = check_fopen(cleaninput_txt, "w");
-		lexerFiles->tokenlist = check_fopen(tokenlist_txt, "w");
+		lexerFiles->input = fopen_ff(input_txt, "r");
+		lexerFiles->table = fopen_ff(lexemetable_txt, "w");
+		lexerFiles->clean = fopen_ff(cleaninput_txt, "w");
+		lexerFiles->tokenlist = fopen_ff(tokenlist_txt, "w");
 		if(opts & OPT_TEE_TOKLIST) {
 			/* Duplicate token list to stdout */
 			lexerFiles->tokenlist = ftee(lexerFiles->tokenlist, stdout);
 		}
-		lexerFiles->graph = check_fopen(lexer_dot, "w");
+		lexerFiles->graph = fopen_ff(lexer_dot, "w");
 		
 		/* Run the lexer */
 		err = run_lexer(lexerFiles);
@@ -149,22 +145,22 @@ int main(int argc, char* argv[]) {
 		
 		/* Create an object to store the file pointers needed by the compiler */
 		CompilerFiles* compilerFiles = CompilerFiles_new();
-		compilerFiles->tokenlist = check_fopen(tokenlist_txt, "r");
-		compilerFiles->symtab = check_fopen(symboltable_txt, "w");
+		compilerFiles->tokenlist = fopen_ff(tokenlist_txt, "r");
+		compilerFiles->symtab = fopen_ff(symboltable_txt, "w");
 		if(opts & OPT_TEE_SYMTAB) {
 			/* Duplicate symbol table to stdout */
 			compilerFiles->symtab = ftee(compilerFiles->symtab, stdout);
 		}
-		compilerFiles->mcode = check_fopen(mcode_txt, "w");
+		compilerFiles->mcode = fopen_ff(mcode_txt, "w");
 		if(opts & OPT_TEE_MCODE) {
 			/* Duplicate machine code to stdout */
 			compilerFiles->mcode = ftee(compilerFiles->mcode, stdout);
 		}
-		compilerFiles->ast = check_fopen(ast_dot, "w");
-	#if DEBUG
-		compilerFiles->unoptimized_cfg = check_fopen(unoptimized_cfg_dot, "w");
-	#endif
-		compilerFiles->cfg = check_fopen(cfg_dot, "w");
+		compilerFiles->ast = fopen_ff(ast_dot, "w");
+#if DEBUG
+		compilerFiles->unoptimized_cfg = fopen_ff(unoptimized_cfg_dot, "w");
+#endif
+		compilerFiles->cfg = fopen_ff(cfg_dot, "w");
 		
 		/* Compile the tokens the lexer scanned from the source code into the machine code */
 		err = run_compiler(compilerFiles, parserType, codegenType);
@@ -181,13 +177,13 @@ int main(int argc, char* argv[]) {
 	if(!(opts & OPT_SKIP_RUN)) {
 		/* Create an object to hold the files needed by the VM */
 		VMFiles* vmFiles = VMFiles_new();
-		vmFiles->mcode = check_fopen(mcode_txt, "r");
-		vmFiles->acode = check_fopen(acode_txt, "w");
+		vmFiles->mcode = fopen_ff(mcode_txt, "r");
+		vmFiles->acode = fopen_ff(acode_txt, "w");
 		if(opts & OPT_TEE_DISASM) {
 			/* Duplicate the disassembled code file to stdout */
 			vmFiles->acode = ftee(vmFiles->acode, stdout);
 		}
-		vmFiles->stacktrace = check_fopen(stacktrace_txt, "w");
+		vmFiles->stacktrace = fopen_ff(stacktrace_txt, "w");
 		if(opts & OPT_TEE_TRACE) {
 			/* Duplicate the stacktrace file to stdout */
 			vmFiles->stacktrace = ftee(vmFiles->stacktrace, stdout);

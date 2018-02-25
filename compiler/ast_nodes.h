@@ -79,56 +79,50 @@ enum EXPR_TYPE {
 struct AST_Block {
 	OBJECT_BASE;
 
-	AST_ConstDecls* consts;       /*!< Optional */
-	AST_VarDecls* vars;           /*!< Optional */
-	AST_ProcDecls* procs;         /*!< Optional */
-	AST_Stmt* stmt;               /*!< Optional */
+	AST_ConstDecls* consts;             /*!< Optional */
+	AST_VarDecls* vars;                 /*!< Optional */
+	AST_ProcDecls* procs;               /*!< Optional */
+	AST_Stmt* stmt;                     /*!< Optional */
 };
 DECL(AST_Block);
 
 struct AST_ConstDecls {
 	OBJECT_BASE;
 	
-	size_t const_count;           /*!< At least one required */
-	size_t const_cap;
-	char** idents;
-	Word* values;
+	dynamic_array(struct {
+		char* ident;
+		Word value;
+	}) consts;                          /*!< At least one required */
 };
 DECL(AST_ConstDecls);
 
 struct AST_VarDecls {
 	OBJECT_BASE;
 	
-	size_t var_count;             /*!< At least one required */
-	size_t var_cap;
-	char** vars;
+	dynamic_array(char*) vars;          /*!< At least one required */
 };
 DECL(AST_VarDecls);
 
 struct AST_ProcDecls {
 	OBJECT_BASE;
-
-	size_t proc_count;            /*!< At least one required */
-	size_t proc_cap;
-	AST_Proc** procs;
+	
+	dynamic_array(AST_Proc*) procs;     /*!< At least one required */
 };
 DECL(AST_ProcDecls);
 
 struct AST_Proc {
 	OBJECT_BASE;
 	
-	char* ident;                  /*!< Required */
-	AST_ParamDecls* param_decls;  /*!< Required */
-	AST_Block* body;              /*!< Required */
+	char* ident;                        /*!< Required */
+	AST_ParamDecls* param_decls;        /*!< Required */
+	AST_Block* body;                    /*!< Required */
 };
 DECL(AST_Proc);
 
 struct AST_ParamDecls {
 	OBJECT_BASE;
 	
-	size_t param_count;           /*!< Zero or more */
-	size_t param_cap;
-	char** params;
+	dynamic_array(char*) params;        /*!< Zero or more */
 };
 DECL(AST_ParamDecls);
 
@@ -140,32 +134,30 @@ struct AST_Stmt {
 		struct {
 			char* ident;
 			AST_Expr* value;
-		} assign;                 /*!< STMT_ASSIGN */
+		} assign;                       /*!< STMT_ASSIGN */
 		struct {
 			char* ident;
 			AST_ParamList* param_list;
-		} call;                   /*!< STMT_CALL */
+		} call;                         /*!< STMT_CALL */
 		struct {
-			size_t stmt_count;
-			size_t stmt_cap;
-			AST_Stmt** stmts;
-		} begin;                  /*!< STMT_BEGIN */
+			dynamic_array(AST_Stmt*) stmts;
+		} begin;                        /*!< STMT_BEGIN */
 		struct {
 			AST_Cond* cond;
 			AST_Stmt* then_stmt;
 			AST_Stmt* else_stmt;
-		} if_stmt;                /*!< STMT_IF */
+		} if_stmt;                      /*!< STMT_IF */
 		struct {
 			AST_Cond* cond;
 			AST_Stmt* do_stmt;
-		} while_stmt;             /*!< STMT_WHILE */
+		} while_stmt;                   /*!< STMT_WHILE */
 		struct {
 			char* ident;
-		} read;                   /*!< STMT_READ */
+		} read;                         /*!< STMT_READ */
 		struct {
 			char* ident;
-		} write;                  /*!< STMT_WRITE */
-	} stmt;                       /*!< Required */
+		} write;                        /*!< STMT_WRITE */
+	} stmt;                             /*!< Required */
 };
 DECL(AST_Stmt);
 
@@ -174,12 +166,12 @@ struct AST_Cond {
 	
 	COND_TYPE type;
 	union {
-		AST_Expr* operand;        /*!< COND_ODD (unary operator) */
+		AST_Expr* operand;              /*!< COND_ODD (unary operator) */
 		struct {
 			AST_Expr* left;
 			AST_Expr* right;
-		} binop;                  /*!< COND_{EQ,NE,LT,LE,GT,GE} (binary operators) */
-	} values;                     /*!< Required */
+		} binop;                        /*!< COND_{EQ,NE,LT,LE,GT,GE} (binary operators) */
+	} values;                           /*!< Required */
 };
 DECL(AST_Cond);
 
@@ -188,27 +180,25 @@ struct AST_Expr {
 	
 	EXPR_TYPE type;
 	union {
-		char* ident;              /*!< EXPR_VAR (variable name) */
-		Word num;                 /*!< EXPR_NUM (integer literal) */
-		AST_Expr* operand;        /*!< EXPR_NEG (unary operator) */
+		char* ident;                    /*!< EXPR_VAR (variable name) */
+		Word num;                       /*!< EXPR_NUM (integer literal) */
+		AST_Expr* operand;              /*!< EXPR_NEG (unary operator) */
 		struct {
 			AST_Expr* left;
 			AST_Expr* right;
-		} binop;                  /*!< EXPR_{ADD,SUB,MUL,DIV} (binary operators) */
+		} binop;                        /*!< EXPR_{ADD,SUB,MUL,DIV} (binary operators) */
 		struct {
 			char* ident;
 			AST_ParamList* param_list;
-		} call;                   /*!< EXPR_CALL (procedure call) */
-	} values;                     /*!< Required */
+		} call;                         /*!< EXPR_CALL (procedure call) */
+	} values;                           /*!< Required */
 };
 DECL(AST_Expr);
 
 struct AST_ParamList {
 	OBJECT_BASE;
 	
-	size_t param_count;           /*!< Zero or more */
-	size_t param_cap;
-	AST_Expr** params;
+	dynamic_array(AST_Expr*) params;    /*!< Zero or more */
 };
 DECL(AST_ParamList);
 

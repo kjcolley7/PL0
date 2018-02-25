@@ -24,7 +24,7 @@ Lexer* Lexer_initWithFile(Lexer* self, FILE* fin) {
 		self->line_number = 1;
 		self->stream = fin;
 		self->fsm = State_new();
-		assert(self->fsm != NULL);
+		ASSERT(self->fsm != NULL);
 	}
 	
 	return self;
@@ -38,11 +38,10 @@ static State* getState(State* cur, const char* prefix) {
 	}
 	
 	/* Check if there is already a state for the next character */
-	size_t i;
-	for(i = 0; i < cur->transition_count; i++) {
-		if(prefix[0] == cur->transitions[i]->exact) {
+	foreach(&cur->transitions, ptrans) {
+		if(prefix[0] == (*ptrans)->exact) {
 			/* Found pre-existing state for next character, so descend into that state */
-			return getState(cur->transitions[i]->state, &prefix[1]);
+			return getState((*ptrans)->state, &prefix[1]);
 		}
 	}
 	
@@ -113,7 +112,7 @@ Token* Lexer_nextToken(Lexer* self) {
 		
 		/* Enlarge lexeme buffer if necessary */
 		if(lexeme_end == self->lexeme_cap) {
-			expand(&self->lexeme, &self->lexeme_cap);
+			expand_array(&self->lexeme, &self->lexeme_cap);
 		}
 		
 		/* Store the current character in the next position in the lexeme buffer */

@@ -11,30 +11,26 @@
 
 
 static void BasicBlock_invalidateTail(BasicBlock* self);
-static void BasicBlock_addInsnRaw(BasicBlock* self, Insn insn);
-static void BasicBlock_removeInsn(BasicBlock* self, Word index);
+static void BasicBlock_removeInsn(BasicBlock* self, size_t index);
 static void BasicBlock_genTail(BasicBlock* self, uint16_t level);
 static void BasicBlock_appendLine(char** label, const char* line);
 
 
 Destroyer(BasicBlock) {
 	release(&self->next);
-	destroy(&self->insns);
-	destroy(&self->syms);
-	destroy(&self->sym_indices);
-	destroy(&self->xrefs);
+	clear_array(&self->insns);
+	clear_array(&self->symrefs);
+	clear_array(&self->coderefs);
 }
 
 DEF_CUSTOM(BasicBlock) {
 	self->code_addr = ADDR_UND;
-	self->cond_index = -1;
-	self->tail_index = -1;
 	return self;
 }
 
 BasicBlock* BasicBlock_createNext(BasicBlock** bb) {
 	/* Make sure not to replace the pointer to an existing basic block */
-	assert((*bb)->next == NULL);
+	ASSERT((*bb)->next == NULL);
 	BasicBlock* next = BasicBlock_new();
 	next->prev = *bb;
 	(*bb)->next = next;
@@ -43,9 +39,8 @@ BasicBlock* BasicBlock_createNext(BasicBlock** bb) {
 	BasicBlock_invalidateTail(*bb);
 	
 #if DEBUG
-	Word i;
-	for(i = 0; i < (*bb)->insn_count; i++) {
-		assert((*bb)->insns[i].op != OP_BREAK);
+	foreach(&(*bb)->insns, pinsn) {
+		ASSERT(pinsn->op != OP_BREAK);
 	}
 #endif
 	
@@ -54,46 +49,46 @@ BasicBlock* BasicBlock_createNext(BasicBlock** bb) {
 }
 
 void BasicBlock_markCondition(BasicBlock* self) {
-	self->cond_index = self->insn_count;
+	self->cond_index = (Word)self->insns.count;
 }
 
 void BasicBlock_markSymbol(BasicBlock* self, Symbol* sym) {
-	if(self->sym_count == self->sym_cap) {
-		size_t old_cap = self->sym_cap;
-		expand(&self->syms, &old_cap);
-		expand(&self->sym_indices, &self->sym_cap);
-	}
-	
-	self->syms[self->sym_count] = sym;
-	self->sym_indices[self->sym_count++] = self->insn_count;
+	element_type(self->symrefs) symref = {
+		.sym = sym,
+		.index = (Word)self->insns.count
+	};
+	append(&self->symrefs, symref);
 }
 
 static void BasicBlock_invalidateTail(BasicBlock* self) {
-	if(self->tail_index < 0) {
+	/* If this basic block doesn't have a tail, there's nothing to do */
+	if(!(self->flags & BB_HAS_TAIL)) {
 		return;
 	}
 	
 	/* Clear the inverted condition flag, as that is set by genTail */
-	self->invert_cond = false;
+	self->flags &= ~BB_INVERT_CONDITION;
 	
 	/* Keep chopping off the tail one instruction at a time until there's nothing left */
-	while(self->insn_count > self->tail_index) {
-		BasicBlock_removeInsn(self, self->insn_count - 1);
+	while(self->insns.count > self->tail_index) {
+		BasicBlock_removeInsn(self, self->insns.count - 1);
 	}
-	self->tail_index = -1;
+	
+	/* This basic block no longer has a tail */
+	self->flags &= ~BB_HAS_TAIL;
 }
 
 bool BasicBlock_isEmpty(BasicBlock* self) {
 	/* Empty and is NOT the first basic block of a procedure */
-	return self == NULL || (self->insn_count == 0 && self->prev != NULL);
+	return self == NULL || (self->insns.count == 0 && self->prev != NULL);
 }
 
 bool BasicBlock_isEmptyProc(BasicBlock* self) {
 	/* Empty procedure if there's at most one INC instruction and no other basic blocks */
 	return self == NULL ||
 	       (self->prev == NULL && self->next == NULL &&
-	        (self->insn_count == 0 ||
-	         (self->insn_count == 1 && self->insns[0].op == OP_INC)));
+	        (self->insns.count == 0 ||
+	         (self->insns.count == 1 && self->insns.elems[0].op == OP_INC)));
 }
 
 void BasicBlock_setTarget(BasicBlock* self, BasicBlock* target) {
@@ -109,7 +104,7 @@ void BasicBlock_setTarget(BasicBlock* self, BasicBlock* target) {
 }
 
 void BasicBlock_setFalseTarget(BasicBlock* self, BasicBlock* false_target) {
-	self->conditional = true;
+	self->flags |= BB_HAS_CONDITION;
 	
 	/* Remove the reference to the previous target */
 	BasicBlock_removeXref(self->ztarget, self);
@@ -127,13 +122,8 @@ void BasicBlock_addXref(BasicBlock* self, BasicBlock* from) {
 		return;
 	}
 	
-	/* Expand array if necessary */
-	if(self->xref_count == self->xref_cap) {
-		expand(&self->xrefs, &self->xref_cap);
-	}
-	
-	/* Add xref */
-	self->xrefs[self->xref_count++] = from;
+	/* Append xref */
+	append(&self->coderefs, from);
 }
 
 void BasicBlock_removeXref(BasicBlock* self, BasicBlock* from) {
@@ -142,17 +132,16 @@ void BasicBlock_removeXref(BasicBlock* self, BasicBlock* from) {
 	}
 	
 	/* Number of xrefs will almost always be small, so O(n) is fine */
-	size_t i;
-	for(i = 0; i < self->xref_count; i++) {
-		if(self->xrefs[i] == from) {
+	foreach(&self->coderefs, pxref) {
+		if(*pxref == from) {
 			/* Remove the reference */
-			delete_element(self->xrefs, i, self->xref_count--);
+			remove_element(&self->coderefs, pxref);
 			break;
 		}
 	}
 	
 	/* No xrefs and not the first basic block means this can be removed */
-	if(self->prev != NULL && self->xref_count == 0) {
+	if(self->prev != NULL && self->coderefs.count == 0) {
 		BasicBlock* prev = self->prev;
 		BasicBlock* next = self->next;
 		
@@ -172,19 +161,9 @@ void BasicBlock_removeXref(BasicBlock* self, BasicBlock* from) {
 	}
 }
 
-static void BasicBlock_addInsnRaw(BasicBlock* self, Insn insn) {
-	/* Expand the array if necessary */
-	if(self->insn_count == self->insn_cap) {
-		expand(&self->insns, &self->insn_cap);
-	}
-	
-	/* Add the instruction */
-	self->insns[self->insn_count++] = insn;
-}
-
 void BasicBlock_addInsn(BasicBlock* self, Insn insn) {
 	/* Add the instruction and invalidate the tail */
-	BasicBlock_addInsnRaw(self, insn);
+	append(&self->insns, insn);
 	BasicBlock_invalidateTail(self);
 }
 
@@ -198,21 +177,20 @@ void BasicBlock_setAddress(BasicBlock* self, Word addr) {
 
 void BasicBlock_resolve(BasicBlock* self, Block* scope) {
 	/* Resolve all the undefined symbols in this basic block */
-	size_t i;
-	for(i = 0; i < self->sym_count; i++) {
-		Symbol* sym = self->syms[i];
-		Insn* insn = &self->insns[self->sym_indices[i]];
+	foreach(&self->symrefs, symref) {
+		Symbol* sym = symref->sym;
+		Insn* pinsn = &self->insns.elems[symref->index];
 		
 		switch(sym->type) {
 			case SYM_CONST:
 				/* Set the immediate value of this LIT instruction to the value of the constant */
-				insn->imm = sym->value.number;
+				pinsn->imm = sym->value.number;
 				break;
 			
 			case SYM_VAR:
 				/* Set the level and offset of the variable for this LOD/STO instruction */
-				insn->lvl = scope->symtree->level - sym->level;
-				insn->imm = sym->value.frame_offset;
+				pinsn->lvl = scope->symtree->level - sym->level;
+				pinsn->imm = sym->value.frame_offset;
 				break;
 				
 			case SYM_PROC: {
@@ -226,35 +204,31 @@ void BasicBlock_resolve(BasicBlock* self, Block* scope) {
 				}
 				
 				/* Set the target address and relative level of this CAL instruction */
-				insn->lvl = scope->symtree->level - sym->level;
-				insn->imm = addr;
+				pinsn->lvl = scope->symtree->level - sym->level;
+				pinsn->imm = addr;
 				break;
 			}
 			
 			default:
-				assert(!"Invalid symbol type");
+				ASSERT(!"Invalid symbol type");
 		}
 	}
 }
 
-static void BasicBlock_removeInsn(BasicBlock* self, Word index) {
+static void BasicBlock_removeInsn(BasicBlock* self, size_t index) {
 	/* Remove the instruction from the instructions array */
-	delete_element(self->insns, index, self->insn_count--);
+	remove_index(&self->insns, index);
 	
 	/* Look for a symbol that references the deleted instruction */
-	size_t i;
-	for(i = 0; i < self->sym_count; i++) {
-		if(self->sym_indices[i] == index) {
+	enumerate(&self->symrefs, i, symref) {
+		if(symref->index == index) {
 			/* Remove symbol from symbol array */
-			delete_element(self->sym_indices, i, self->sym_count);
-			delete_element(self->syms, i, self->sym_count--);
-			break;
+			remove_index(&self->symrefs, i--);
 		}
-	}
-	
-	/* Continue looping through the symbols and decrement each index */
-	for(; i < self->sym_count; i++) {
-		--self->sym_indices[i];
+		else if(symref->index > index) {
+			/* Decrement each index after the removed element */
+			--symref->index;
+		}
 	}
 	
 	/* Bump the condition index forward one if it was past the deleted instruction */
@@ -273,17 +247,17 @@ void BasicBlock_optimize(BasicBlock* self) {
 	BasicBlock_invalidateTail(self);
 	
 	/* Optimize any referenced procedures */
-	size_t i;
-	for(i = 0; i < self->sym_count; i++) {
-		if(self->syms[i]->type == SYM_PROC) {
-			Block* blk = self->syms[i]->value.procedure.body;
+	enumerate(&self->symrefs, i, symref) {
+		if(symref->sym->type == SYM_PROC) {
+			Block* blk = symref->sym->value.procedure.body;
 			
 			/* Optimize the procedure */
 			Block_optimize(blk);
 			
 			/* Is the call even required any more? */
 			if(Block_isEmpty(blk)) {
-				BasicBlock_removeInsn(self, self->sym_indices[i--]);
+				BasicBlock_removeInsn(self, symref->index);
+				--i;
 			}
 		}
 	}
@@ -293,7 +267,7 @@ void BasicBlock_optimize(BasicBlock* self) {
 		BasicBlock_setTarget(self, self->target->target);
 	}
 	
-	if(self->conditional) {
+	if(self->flags & BB_HAS_CONDITION) {
 		/* Bypass false jumps in conditionals */
 		while(self->ztarget != NULL && BasicBlock_isEmpty(self->ztarget)) {
 			BasicBlock_setFalseTarget(self, self->ztarget->target);
@@ -316,23 +290,24 @@ void BasicBlock_optimize(BasicBlock* self) {
 	}
 }
 
-#define ADD_INSN(insn) BasicBlock_addInsnRaw(self, insn)
+#define ADD_INSN(insn) append(&self->insns, insn)
 static void BasicBlock_genTail(BasicBlock* self, uint16_t level) {
-	if(self->tail_index >= 0) {
+	/* If this basic block already has a tail, do nothing */
+	if(self->flags & BB_HAS_TAIL) {
 		return;
 	}
 	
 	/* Starting the tail, so mark the position */
-	self->tail_index = self->insn_count;
+	self->tail_index = self->insns.count;
 	
 	/* Instruction used to end execution in this procedure */
 	Insn ret = level == 0 ? MAKE_HALT() : MAKE_RET();
 	
 	/* Produce the jumps necessary to branch to the next basic block(s) */
-	if(self->conditional && self->target != self->ztarget) {
+	if((self->flags & BB_HAS_CONDITION) && self->target != self->ztarget) {
 		/* Get last instruction (should be the condition ALU instruction) */
-		assert(self->tail_index >= 1);
-		Insn last = self->insns[self->tail_index - 1];
+		ASSERT(self->tail_index >= 1);
+		Insn last = self->insns.elems[self->tail_index - 1];
 		
 		/* Conditionally execute either target or ztarget */
 		if(self->target == NULL) {
@@ -367,7 +342,7 @@ static void BasicBlock_genTail(BasicBlock* self, uint16_t level) {
 				ADD_INSN(MAKE_EQL());
 			}
 			else {
-				self->invert_cond = true;
+				self->flags |= BB_INVERT_CONDITION;
 			}
 			ADD_INSN(MAKE_JPC(self->target->code_addr));
 			ADD_INSN(ret);
@@ -387,7 +362,7 @@ static void BasicBlock_genTail(BasicBlock* self, uint16_t level) {
 					ADD_INSN(MAKE_EQL());
 				}
 				else {
-					self->invert_cond = true;
+					self->flags |= BB_INVERT_CONDITION;
 				}
 				ADD_INSN(MAKE_JPC(self->target->code_addr));
 			}
@@ -414,28 +389,27 @@ static void BasicBlock_genTail(BasicBlock* self, uint16_t level) {
 #undef ADD_INSN
 
 void BasicBlock_emit(BasicBlock* self, FILE* fp, uint16_t level) {
-	assert(self->code_addr != ADDR_UND);
+	ASSERT(self->code_addr != ADDR_UND);
 	
 	/* Generate the code for the tail of this basic block to handle control flow */
 	BasicBlock_genTail(self, level);
 	
 	/* Output all instructions in this basic block */
-	Word i;
-	for(i = 0; i < self->insn_count; i++) {
-		/* Invert the condition instruction directly before the tail if invert_cond is set */
-		if(i >= 1 && i == self->tail_index - 1 && self->invert_cond) {
-			Insn_emit(MAKE_INV(self->insns[i]), fp);
+	enumerate(&self->insns, i, pinsn) {
+		/* Invert the condition instruction directly before the tail if the flag is set */
+		if(HAS_ALL_FLAGS(self->flags, BB_INVERT_CONDITION | BB_HAS_TAIL) && i == self->tail_index - 1) {
+			Insn_emit(MAKE_INV(*pinsn), fp);
 		}
 		else {
-			Insn_emit(self->insns[i], fp);
+			Insn_emit(*pinsn, fp);
 		}
 	}
 }
 
-Word BasicBlock_getInstructionCount(BasicBlock* self) {
+size_t BasicBlock_getInstructionCount(BasicBlock* self) {
 	/* Build the tail to count the instructions, then invalidate it because the level is unknown */
 	BasicBlock_genTail(self, 0);
-	Word ret = (Word)self->insn_count;
+	size_t ret = self->insns.count;
 	BasicBlock_invalidateTail(self);
 	return ret;
 }
@@ -472,16 +446,17 @@ void BasicBlock_drawGraph(BasicBlock* self, Graphviz* gv, uint16_t level) {
 		BasicBlock_genTail(self, level);
 		
 		char* label = NULL;
-		Word i;
 		size_t sym_idx = 0;
-		for(i = 0; i < self->insn_count; i++) {
+		enumerate(&self->insns, i, pinsn) {
 			/* Disassemble the instruction and invert the condition if necessary */
 			char* dis;
-			if(i >= 1 && i == self->tail_index - 1 && self->invert_cond) {
-				dis = Insn_prettyDis(MAKE_INV(self->insns[i]));
+			if(HAS_ALL_FLAGS(self->flags, BB_INVERT_CONDITION | BB_HAS_TAIL)
+				&& i == self->tail_index - 1
+			) {
+				dis = Insn_prettyDis(MAKE_INV(*pinsn));
 			}
 			else {
-				dis = Insn_prettyDis(self->insns[i]);
+				dis = Insn_prettyDis(*pinsn);
 			}
 			
 			/* Add the address */
@@ -496,14 +471,16 @@ void BasicBlock_drawGraph(BasicBlock* self, Graphviz* gv, uint16_t level) {
 			dis = addr;
 			
 			/* Check if any relocation entries apply to this instruction */
-			if(sym_idx < self->sym_count) {
-				if(i == self->sym_indices[sym_idx]) {
+			if(sym_idx < self->symrefs.count) {
+				element_type(self->symrefs)* symref = &self->symrefs.elems[sym_idx];
+				if(i == symref->index) {
 					/* There is a relocation entry for this instruction, so we can show more info */
-					const char* procname = self->syms[sym_idx++]->name;
+					const char* procname = symref->sym->name;
+					++sym_idx;
 					
 					/* Annotate the CAL instruction with the name of the procedure being called */
-					char* extra_dis;
-					asprintf_ff(&extra_dis, "%s (<font color=\"" CAL_COLOR "\">%s</font>)", dis, procname);
+					char* extra_dis = rsprintf_ff(
+						"%s (<font color=\"" CAL_COLOR "\">%s</font>)", dis, procname);
 					destroy(&dis);
 					dis = extra_dis;
 				}
@@ -523,7 +500,7 @@ void BasicBlock_drawGraph(BasicBlock* self, Graphviz* gv, uint16_t level) {
 	release(&node);
 	
 	/* Draw edges from this basic block to the targets */
-	if(self->conditional) {
+	if(self->flags & BB_HAS_CONDITION) {
 		if(self->target != NULL) {
 			Graphviz_draw(gv, "<%p>:s -> <%p>:n [color=green];", self, self->target);
 		}
@@ -538,8 +515,7 @@ void BasicBlock_drawGraph(BasicBlock* self, Graphviz* gv, uint16_t level) {
 }
 
 static void BasicBlock_appendLine(char** label, const char* line) {
-	char* tmp;
-	asprintf_ff(&tmp, "%s%s<br align=\"left\"/>", *label ?: "", line ?: "");
+	char* tmp = rsprintf_ff("%s%s<br align=\"left\"/>", *label ?: "", line ?: "");
 	destroy(label);
 	*label = tmp;
 }

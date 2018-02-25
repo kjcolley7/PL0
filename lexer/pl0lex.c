@@ -48,8 +48,8 @@ int run_lexer(LexerFiles* files) {
 	Graphviz* gv = Graphviz_initWithFile(Graphviz_alloc(), files->graph, "Lexer");
 	if(gv != NULL) {
 		Lexer_drawGraph(lexer, gv);
+		release(&gv);
 	}
-	release(&gv);
 	
 	/* Print the lexeme table header */
 	fprintf(files->table, "lexeme\ttoken type\n");
@@ -175,8 +175,8 @@ static bool match_number(char c) {
 
 static void add_identifier_transitions(State* cur, Transition* trans) {
 	size_t i;
-	for(i = 0; i < cur->transition_count; i++) {
-		Transition* next = cur->transitions[i];
+	for(i = 0; i < cur->transitions.count; i++) {
+		Transition* next = cur->transitions.elems[i];
 		
 		/* This code will break if we ever add a reserved word with numbers in it */
 		if(next->matcher == NULL && isalpha(next->exact)) {

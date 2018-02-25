@@ -19,7 +19,7 @@ typedef struct Block Block;
 #include "config.h"
 #include "basicblock.h"
 #include "compiler/ast_nodes.h"
-#include "symtree.h"
+#include "compiler/codegen/symtree.h"
 #include "graphviz.h"
 
 struct Block {
@@ -32,7 +32,7 @@ struct Block {
 	BasicBlock* code;
 	
 	/*! Total number of instructions in the code graph including jumps and returns */
-	Word code_length;
+	size_t code_length;
 	
 	/*! Next block in the linked list */
 	Block* next;

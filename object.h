@@ -68,7 +68,7 @@ static void type##_destroy(__unused type* self)
 /*! Base structure used for reference counted objects */
 typedef struct ObjBase {
 	/*! Reference count of the object */
-	ssize_t refcnt;
+	size_t refcnt;
 	
 	/*! Object destructor (doesn't call free()) */
 	void (*dtor)(void*);
@@ -76,37 +76,48 @@ typedef struct ObjBase {
 
 /*! Initializes the object base */
 #define ObjBase_init(obj, type) \
-(type*)_ObjBase_init(&obj->_base, sizeof(type), (void (*)(void*))&type##_destroy)
+(type*)_ObjBase_init(&(obj)->_base, sizeof(type), (void (*)(void*))&type##_destroy)
 static inline void* _ObjBase_init(ObjBase* self, size_t size, void (*dtor)(void*)) {
 	if(self) {
+		/* Zero-initialize the object's storage */
 		memset(self, 0, size);
-		self->refcnt = 1;
+		
+		/* 2 because the low bit is used to determine if the object shouldn't be freed */
+		self->refcnt = 2;
 		self->dtor = dtor;
 	}
 	
 	return self;
 }
 
-/*! Used after initialization to specify that an object is local and not dynamically allocated */
+/*! Used after initialization to specify that an object should never be freed,
+ * such as when it is a stack allocated variable rather than dynamically allocated
+ */
 #define localize(obj) (__typeof__(obj))_localize(&(obj)->_base)
 static inline void* _localize(ObjBase* base) {
-	if(base->refcnt > 0) {
-		base->refcnt = -base->refcnt;
-	}
-	
+	base->refcnt |= 1;
 	return base;
 }
 
 /*! Increment the reference count of an object and return the object */
 #define retain(obj) (__typeof__(obj))_retain(&(obj)->_base)
 static inline void* _retain(ObjBase* base) {
-	int dir = base->refcnt > 0 ? 1 : -1;
-	base->refcnt += dir;
+	/*
+	 * If incrementing the reference count would cause it to overflow, saturate the
+	 * reference count instead. This will intentionally leak the memory, which is a
+	 * better outcome than a use-after-free (UAF) security vulnerability.
+	 */
+	if((base->refcnt | 1) == SIZE_MAX) {
+		return base;
+	}
+	
+	/* Increment the reference count */
+	base->refcnt += 2;
 	return base;
 }
 
 /*! Release a reference to an object (and destroy it when reference count reaches zero)
- @note This sets the pointed to variable to NULL to prevent use after free bugs
+ * @note This sets the pointed to variable to NULL to prevent use after free bugs
  */
 #define release(pobj) do { \
 	__typeof__(pobj) _pobj = (pobj); \
@@ -118,19 +129,23 @@ static inline void* _retain(ObjBase* base) {
 } while(0)
 static inline void _release(ObjBase* base) {
 	/* This shouldn't ever happen */
-	assert(base->refcnt != 0);
+	ASSERT(base->refcnt >= 2);
 	
-	/* Stack-based objects have negative reference counts */
-	int dir = base->refcnt > 0 ? 1 : -1;
-	base->refcnt -= dir;
+	/* This object's reference count has been saturated, so it will never be freed */
+	if((base->refcnt | 1) == SIZE_MAX) {
+		return;
+	}
+	
+	/* Decrement the reference count */
+	base->refcnt -= 2;
 	
 	/* Destroy object when there are no more references to it */
-	if(base->refcnt == 0) {
+	if((base->refcnt & ~1) == 0) {
 		/* Call the destroy method */
 		base->dtor(base);
 		
-		if(dir == 1) {
-			/* Object had a positive reference count, so it was heap-allocated */
+		if((base->refcnt & 1) == 0) {
+			/* Reference count's low bit was unset, so the object is heap-allocated */
 			destroy(&base);
 		}
 	}

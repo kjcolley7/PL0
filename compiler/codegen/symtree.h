@@ -30,23 +30,11 @@ struct SymTree {
 	/*! Lexical level for this node in the symbol tree (same as this node's height) */
 	uint16_t level;
 	
-	/*! Number of children this node has */
-	size_t child_count;
-	
-	/*! Allocated capacity for children for this node */
-	size_t child_cap;
-	
 	/*! Array of children to this node */
-	SymTree** children;
-	
-	/*! Number of symbols in this part of the symbol table */
-	size_t sym_count;
-	
-	/*! Allocated capacity for symbols in this part of the symbol table */
-	size_t sym_cap;
+	dynamic_array(SymTree*) children;
 	
 	/*! Sorted array of symbols */
-	Symbol** syms;
+	dynamic_array(Symbol*) syms;
 	
 	/*! Current size of the stack frame */
 	Word frame_size;

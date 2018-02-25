@@ -81,34 +81,34 @@ for(const char* argname = argv[_argidx-1]; argname != NULL; argname = NULL) \
 
 
 struct argparse {
-	size_t arg_count;
-	size_t arg_cap;
-	struct arg_info {
+	dynamic_array(struct arg_info {
 		int arg_id;
 		char short_name;
 		const char* long_name;
 		const char* description;
-	} *args;
+	}) args;
 	int long_name_width;
 	int has_catchall;
 };
 
-static inline void _argparse_add(struct argparse* argparse_info, int arg_id, char short_name, const char* long_name, const char* description) {
-	/* Expand the args array if it's full */
-	if(argparse_info->arg_count == argparse_info->arg_cap) {
-		expand(&argparse_info->args, &argparse_info->arg_cap);
-	}
-	
-	/* Build the argument description structure */
-	struct arg_info* arg = &argparse_info->args[argparse_info->arg_count++];
-	arg->arg_id = arg_id;
-	arg->short_name = short_name;
-	arg->long_name = long_name;
-	arg->description = description;
+static inline void _argparse_add(
+	struct argparse* argparse_info,
+	int arg_id,
+	char short_name,
+	const char* long_name,
+	const char* description
+) {
+	struct arg_info arg = {
+		.arg_id = arg_id,
+		.short_name = short_name,
+		.long_name = long_name,
+		.description = description
+	};
+	append(&argparse_info->args, arg);
 	
 	/* Update max long_name_width while respecting the upper bound */
-	if(arg->long_name != NULL) {
-		int arglen = (int)MIN(strlen(arg->long_name), LONG_ARG_MAX_WIDTH);
+	if(long_name != NULL) {
+		int arglen = (int)MIN(strlen(long_name), LONG_ARG_MAX_WIDTH);
 		if(arglen > argparse_info->long_name_width) {
 			argparse_info->long_name_width = arglen;
 		}
@@ -135,10 +135,9 @@ static inline int _argparse_parse(struct argparse* argparse_info, int* argidx, i
 	size_t arglen = strlen(arg);
 	if(arglen == 2) {
 		/* This is a short argument, so check all the short args */
-		size_t i;
-		for(i = 0; i < argparse_info->arg_count; i++) {
-			if(arg[1] == argparse_info->args[i].short_name) {
-				ret = argparse_info->args[i].arg_id;
+		foreach(&argparse_info->args, pcur) {
+			if(arg[1] == pcur->short_name) {
+				ret = pcur->arg_id;
 				goto out;
 			}
 		}
@@ -153,10 +152,9 @@ static inline int _argparse_parse(struct argparse* argparse_info, int* argidx, i
 	}
 	else {
 		/* This is a properly formed long argument, so check all the long args */
-		size_t i;
-		for(i = 0; i < argparse_info->arg_count; i++) {
-			if(strcmp(&arg[2], argparse_info->args[i].long_name) == 0) {
-				ret = argparse_info->args[i].arg_id;
+		foreach(&argparse_info->args, pcur) {
+			if(strcmp(&arg[2], pcur->long_name) == 0) {
+				ret = pcur->arg_id;
 				goto out;
 			}
 		}
@@ -187,13 +185,11 @@ static inline int charcmp(const void* a, const void* b) {
 static inline void _argparse_usage(struct argparse* argparse_info, const char* progname) {
 	char shortOptions[256] = {};
 	size_t shortOptionCount = 0;
-	size_t i;
 	
 	/* Get all short option names */
-	for(i = 0; i < argparse_info->arg_count; i++) {
-		struct arg_info* arg = &argparse_info->args[i];
+	foreach(&argparse_info->args, arg) {
 		if(arg->short_name != 0) {
-			assert(shortOptionCount < sizeof(shortOptions));
+			ASSERT(shortOptionCount < sizeof(shortOptions));
 			shortOptions[shortOptionCount++] = arg->short_name;
 		}
 	}
@@ -213,8 +209,7 @@ static inline void _argparse_usage(struct argparse* argparse_info, const char* p
 	printf("Options:\n");
 	
 	/* Print description of each argument */
-	for(i = 0; i < argparse_info->arg_count; i++) {
-		struct arg_info* arg = &argparse_info->args[i];
+	foreach(&argparse_info->args, arg) {
 		printf("    ");
 		
 		/* Print short option (if set) */

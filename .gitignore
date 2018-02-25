@@ -5,6 +5,9 @@ pl0
 *.o
 *.obj
 *.dot
+*.id*
+*.nam
+*.til
 /input.txt
 /cleaninput.txt
 /lexemetable.txt

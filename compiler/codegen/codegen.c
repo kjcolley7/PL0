@@ -27,7 +27,7 @@ Destroyer(Codegen) {
 			break;
 			
 		default:
-			assert(!"Invalid codegen type");
+			ASSERT(!"Invalid codegen type");
 	}
 }
 DEF(Codegen);
@@ -54,7 +54,7 @@ Codegen* Codegen_initWithAST(Codegen* self, AST_Block* prog, CODEGEN_TYPE cgType
 #endif /* WITH_LLVM */
 				
 			default:
-				assert(!"Unknown codegen type");
+				ASSERT(!"Unknown codegen type");
 		}
 		
 		self->cgType = cgType;
@@ -74,7 +74,7 @@ void Codegen_drawGraph(Codegen* self, FILE* fp) {
 #endif /* WITH_LLVM */
 			
 		default:
-			assert(!"Unknown codegen type");
+			ASSERT(!"Unknown codegen type");
 	}
 }
 
@@ -89,7 +89,7 @@ void Codegen_writeSymbolTable(Codegen* self, FILE* fp) {
 #endif /* WITH_LLVM */
 			
 		default:
-			assert(!"Unknown codegen type");
+			ASSERT(!"Unknown codegen type");
 	}
 }
 
@@ -104,6 +104,6 @@ void Codegen_emit(Codegen* self, FILE* fp) {
 #endif /* WITH_LLVM */
 			
 		default:
-			assert(!"Unknown codegen type");
+			ASSERT(!"Unknown codegen type");
 	}
 }

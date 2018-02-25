@@ -32,7 +32,6 @@ int run_compiler(CompilerFiles* files, PARSER_TYPE parserType, CODEGEN_TYPE code
 	int err = EXIT_SUCCESS;
 	
 	/* Allocate and initialize PL/0 parser object */
-//	Parser* parser = Parser_initWithFile(Parser_alloc(), files->tokenlist, parserType);
 	FILE* input_fp = fopen("input.txt", "r");
 	if(!input_fp) {
 		perror("input.txt");

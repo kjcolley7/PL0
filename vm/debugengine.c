@@ -11,6 +11,7 @@
 
 
 typedef enum CMD_TYPE {
+	CMD_INVALID = 0,
 	CMD_BREAKPOINT = 1,
 	CMD_CONTINUE,
 	CMD_STATE,
@@ -48,23 +49,13 @@ typedef struct Command {
 	/*! Command type */
 	CMDTYPE type;
 	
-	/*! Number of arguments given */
-	size_t arg_count;
-	
-	/*! Allocated capacity for arguments */
-	size_t arg_cap;
-	
 	/*! Array of arguments */
-	char** args;
+	dynamic_array(char*) args;
 } Command;
 DECL(Command);
 
 Destroyer(Command) {
-	size_t i;
-	for(i = 0; i < self->arg_count; i++) {
-		destroy(&self->args[i]);
-	}
-	destroy(&self->args);
+	destroy_array(&self->args);
 }
 DEF(Command);
 
@@ -78,25 +69,23 @@ static Command* Command_initWithLine(Command* self, const char* line) {
 		char* cmdstr;
 		while((cmdstr = Command_getNextArgument(&line))) {
 			/* Expand arguments array if necessary */
-			if(self->arg_count == self->arg_cap) {
-				expand(&self->args, &self->arg_cap);
-			}
+			expand_if_full(&self->args);
 			
 			/* Append each argument */
-			self->args[self->arg_count++] = cmdstr;
+			self->args.elems[self->args.count++] = cmdstr;
 		}
 		
 		/* Need at least the command name */
-		if(self->arg_count == 0) {
+		if(self->args.count == 0) {
 			release(&self);
 			return NULL;
 		}
 		
 		/* Set command type */
-		self->type = Command_getType(self->args[0]);
+		self->type = Command_getType(self->args.elems[0]);
 		
 		/* Invalid command? */
-		if(self->type == 0) {
+		if(self->type == CMD_INVALID) {
 			printf("Invalid command\n");
 			release(&self);
 			return NULL;
@@ -142,7 +131,7 @@ static CMDTYPE Command_getType(const char* cmdstr) {
 	}
 	
 	/* Didn't find the command */
-	return 0;
+	return CMD_INVALID;
 }
 
 
@@ -221,7 +210,7 @@ int DebugEngine_run(DebugEngine* self) {
 			case STATUS_RUNNING:
 			case STATUS_NOT_STARTED:
 			default:
-				abort();
+				ASSERT(!"Unknown machine status");
 		}
 	}
 	
@@ -239,7 +228,7 @@ static int DebugEngine_perform(DebugEngine* self, Command* cmd) {
 		case CMD_STEP:       DebugEngine_doStep(self, cmd); break;
 		case CMD_HELP:       DebugEngine_doHelp(self, cmd); break;
 		case CMD_QUIT:       return 1;
-		default: abort();
+		default: ASSERT(!"Unknown debugger command type");
 	}
 	
 	return 0;
@@ -258,8 +247,8 @@ static void DebugEngine_helpBreakpoint(DebugEngine* self) {
 
 
 #define CHECK_ARG_COUNT(argc) do { \
-	if(cmd->arg_count != (argc)) { \
-		printf("Wrong argument count for %s %s\n", cmd->args[0], cmd->args[1]); \
+	if(cmd->args.count != (argc)) { \
+		printf("Wrong argument count for %s %s\n", cmd->args.elems[0], cmd->args.elems[1]); \
 		DebugEngine_helpBreakpoint(self); \
 		return; \
 	} \
@@ -273,12 +262,12 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 	int bpid;
 	bool enabled;
 	
-	if(cmd->arg_count < 2) {
+	if(cmd->args.count < 2) {
 		DebugEngine_helpBreakpoint(self);
 		return;
 	}
 	
-	subcmd = cmd->args[1];
+	subcmd = cmd->args.elems[1];
 	if(strcasecmp(subcmd, "add") == 0 || isdigit(subcmd[0])) {
 		/* Allow a short form like "b <addr>" */
 		if(isdigit(subcmd[0])) {
@@ -287,7 +276,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		}
 		else {
 			CHECK_ARG_COUNT(3);
-			str = cmd->args[2];
+			str = cmd->args.elems[2];
 		}
 		
 		/* Parse addr */
@@ -308,8 +297,8 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		/* List breakpoints */
 		printf("Breakpoints:\n");
 		size_t i;
-		for(i = 0; i < self->cpu->bp_count; i++) {
-			Breakpoint* bp = &self->cpu->bps[i];
+		for(i = 0; i < self->cpu->bps.count; i++) {
+			Breakpoint* bp = &self->cpu->bps.elems[i];
 			printf("Breakpoint #%d at address %d is %sabled\n",
 				(int)i + 1, bp->addr, bp->enabled ? "en" : "dis");
 		}
@@ -318,7 +307,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		CHECK_ARG_COUNT(3);
 		
 		/* Parse id */
-		bpid = (int)strtol(cmd->args[2], &end, 0);
+		bpid = (int)strtol(cmd->args.elems[2], &end, 0);
 		if(*end != '\0') {
 			printf("Invalid breakpoint id given to breakpoint disable\n");
 			DebugEngine_helpBreakpoint(self);
@@ -334,7 +323,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		CHECK_ARG_COUNT(3);
 		
 		/* Parse id */
-		bpid = (int)strtol(cmd->args[2], &end, 0);
+		bpid = (int)strtol(cmd->args.elems[2], &end, 0);
 		if(*end != '\0') {
 			printf("Invalid breakpoint id given to breakpoint enable\n");
 			DebugEngine_helpBreakpoint(self);
@@ -350,7 +339,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		CHECK_ARG_COUNT(3);
 		
 		/* Parse id */
-		bpid = (int)strtol(cmd->args[2], &end, 0);
+		bpid = (int)strtol(cmd->args.elems[2], &end, 0);
 		if(*end != '\0') {
 			printf("Invalid breakpoint id given to breakpoint toggle\n");
 			DebugEngine_helpBreakpoint(self);
@@ -384,7 +373,7 @@ static void DebugEngine_helpRunning(DebugEngine* self) {
 }
 
 static void DebugEngine_doContinue(DebugEngine* self, Command* cmd) {
-	if(cmd->arg_count != 1) {
+	if(cmd->args.count != 1) {
 		printf("Wrong argument count for continue\n");
 		DebugEngine_helpRunning(self);
 		return;
@@ -398,7 +387,7 @@ static void DebugEngine_doContinue(DebugEngine* self, Command* cmd) {
 }
 
 static void DebugEngine_doState(DebugEngine* self, Command* cmd) {
-	if(cmd->arg_count != 1) {
+	if(cmd->args.count != 1) {
 		printf("Wrong argument count for state\n");
 		DebugEngine_helpRunning(self);
 		return;
@@ -409,7 +398,7 @@ static void DebugEngine_doState(DebugEngine* self, Command* cmd) {
 }
 
 static void DebugEngine_doStep(DebugEngine* self, Command* cmd) {
-	if(cmd->arg_count != 1) {
+	if(cmd->args.count != 1) {
 		printf("Wrong argument count for state\n");
 		DebugEngine_helpRunning(self);
 		return;
@@ -421,11 +410,11 @@ static void DebugEngine_doStep(DebugEngine* self, Command* cmd) {
 }
 
 static void DebugEngine_doHelp(DebugEngine* self, Command* cmd) {
-	if(cmd->arg_count >= 2) {
+	if(cmd->args.count >= 2) {
 		/* Specific help for commands */
-		CMDTYPE type = Command_getType(cmd->args[1]);
+		CMDTYPE type = Command_getType(cmd->args.elems[1]);
 		if(type == 0) {
-			if(strcasecmp(cmd->args[1], "running") == 0) {
+			if(strcasecmp(cmd->args.elems[1], "running") == 0) {
 				/* Set the type to some random running command */
 				type = CMD_CONTINUE;
 			}

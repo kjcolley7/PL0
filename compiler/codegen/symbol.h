@@ -12,11 +12,16 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#if WITH_LLVM
+#include <llvm-c/Core.h>
+#endif /* WITH_LLVM */
+
 typedef struct Symbol Symbol;
 typedef enum SYM_TYPE SYM_TYPE;
 
 #include "object.h"
 #include "block.h"
+#include "config.h"
 
 enum SYM_TYPE {
 	SYM_CONST = 1,
@@ -38,13 +43,18 @@ struct Symbol {
 	
 	/*! The value this symbol holds */
 	union {
-		uint32_t number;        /*!< The numeric value of a constant */
+		Word number;            /*!< The numeric value of a constant */
 		uint32_t frame_offset;  /*!< The local stack frame offset of the variable */
 		struct {
 			size_t param_count; /*!< Number of parameters the procedure takes */
 			Block* body;        /*!< Code graph for the procedure */
 		} procedure;            /*!< The block object of the procedure */
 	} value;
+	
+#if WITH_LLVM
+	/*! The LLVM value of this symbol */
+	LLVMValueRef llvm;
+#endif /* WITH_LLVM */
 };
 DECL(Symbol);
 

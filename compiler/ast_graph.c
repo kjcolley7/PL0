@@ -46,7 +46,7 @@ void AST_Block_drawGraph(AST_Block* self, Graphviz* gv) {
 		Graphviz_drawPtrEdge(gv, self, self->vars);
 	}
 	
-	if(self->procs != NULL && self->procs->proc_count > 0) {
+	if(self->procs != NULL && self->procs->procs.count > 0) {
 		AST_ProcDecls_drawGraph(self->procs, gv);
 		Graphviz_drawPtrEdge(gv, self, self->procs);
 	}
@@ -73,21 +73,20 @@ void AST_ConstDecls_drawGraph(AST_ConstDecls* self, Graphviz* gv) {
 	char* node_id = ptos(self);
 	Graphviz_drawNode(gv, node_id, "<font " FACE_NONTERMINAL ">const-decls</font>");
 	
-	size_t i;
-	for(i = 0; i < self->const_count; i++) {
-		char* const_id = rsprintf_ff("%p[%zu]", self, i);
+	foreach(&self->consts, pconst) {
+		char* const_id = rsprintf_ff("%p", pconst);
 		
 		Graphviz_drawNode(gv, const_id, "<font " FACE_TERMINAL ">=</font>");
 		Graphviz_drawEdge(gv, node_id, const_id);
 		
-		char* name_id = ptos(self->idents[i]);
-		Ident_drawGraph(self->idents[i], gv);
+		char* name_id = ptos(pconst->ident);
+		Ident_drawGraph(pconst->ident, gv);
 		
 		Graphviz_drawEdge(gv, const_id, name_id);
 		destroy(&name_id);
 		
-		char* value_id = ptos(&self->values[i]);
-		Number_drawGraph(&self->values[i], gv);
+		char* value_id = ptos(&pconst->value);
+		Number_drawGraph(&pconst->value, gv);
 		
 		Graphviz_drawEdge(gv, const_id, value_id);
 		destroy(&value_id);
@@ -100,10 +99,9 @@ void AST_ConstDecls_drawGraph(AST_ConstDecls* self, Graphviz* gv) {
 void AST_ParamDecls_drawGraph(AST_ParamDecls* self, Graphviz* gv) {
 	Graphviz_drawPtrNode(gv, self, "<font " FACE_NONTERMINAL ">parameter-block</font>");
 	
-	size_t i;
-	for(i = 0; i < self->param_count; i++) {
-		Ident_drawGraph(self->params[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->params[i]);
+	foreach(&self->params, pparam) {
+		Ident_drawGraph(*pparam, gv);
+		Graphviz_drawPtrEdge(gv, self, *pparam);
 	}
 }
 
@@ -120,10 +118,9 @@ void AST_ParamDecls_drawGraph(AST_ParamDecls* self, Graphviz* gv) {
 void AST_VarDecls_drawGraph(AST_VarDecls* self, Graphviz* gv) {
 	Graphviz_drawPtrNode(gv, self, "<font " FACE_NONTERMINAL ">var-decls</font>");
 	
-	size_t i;
-	for(i = 0; i < self->var_count; i++) {
-		Ident_drawGraph(self->vars[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->vars[i]);
+	foreach(&self->vars, pvar) {
+		Ident_drawGraph(*pvar, gv);
+		Graphviz_drawPtrEdge(gv, self, *pvar);
 	}
 }
 
@@ -143,10 +140,9 @@ void AST_VarDecls_drawGraph(AST_VarDecls* self, Graphviz* gv) {
 void AST_ProcDecls_drawGraph(AST_ProcDecls* self, Graphviz* gv) {
 	Graphviz_drawPtrNode(gv, self, "<font " FACE_NONTERMINAL ">proc-decls</font>");
 	
-	size_t i;
-	for(i = 0; i < self->proc_count; i++) {
-		AST_Proc_drawGraph(self->procs[i], gv);
-		Graphviz_drawPtrEdge(gv, self, self->procs[i]);
+	foreach(&self->procs, pproc) {
+		AST_Proc_drawGraph(*pproc, gv);
+		Graphviz_drawPtrEdge(gv, self, *pproc);
 	}
 }
 
@@ -166,10 +162,12 @@ void AST_ProcDecls_drawGraph(AST_ProcDecls* self, Graphviz* gv) {
  @endcode
  */
 void AST_Proc_drawGraph(AST_Proc* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL ">procedure <font " COLOR_PROC ">%s</font></font>", self->ident);
+	Graphviz_drawPtrNode(gv, self,
+		"<font " FACE_TERMINAL ">procedure <font " COLOR_PROC ">%s</font></font>",
+		self->ident);
 	
 	/* param-decls */
-	if(self->param_decls != NULL && self->param_decls->param_count > 0) {
+	if(self->param_decls != NULL && self->param_decls->params.count > 0) {
 		AST_ParamDecls_drawGraph(self->param_decls, gv);
 		Graphviz_drawPtrEdge(gv, self, self->param_decls);
 	}
@@ -215,7 +213,7 @@ void AST_Stmt_drawGraph(AST_Stmt* self, Graphviz* gv) {
 			break;
 			
 		default:
-			assert(!"Invalid statement type");
+			ASSERT(!"Invalid statement type");
 	}
 }
 
@@ -245,7 +243,7 @@ void AST_Cond_drawGraph(AST_Cond* self, Graphviz* gv) {
 		case COND_LT:  op_str = "&lt;";     break;
 		case COND_NE:  op_str = "&lt;&gt;"; break;
 		default:
-			assert(!"Invalid condition type");
+			ASSERT(!"Invalid condition type");
 	}
 	
 	/* Draw relational operator node */
@@ -276,18 +274,22 @@ void AST_Cond_drawGraph(AST_Cond* self, Graphviz* gv) {
 		}
 		
 		default:
-			assert(!"Invalid condition type");
+			ASSERT(!"Invalid condition type");
 	}
 }
 
 void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv) {
 	switch(self->type) {
 		case EXPR_VAR:
-			Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL " " COLOR_VAR ">%s</font>", self->values.ident);
+			Graphviz_drawPtrNode(gv, self,
+				"<font " FACE_TERMINAL " " COLOR_VAR ">%s</font>",
+				self->values.ident);
 			break;
 		
 		case EXPR_NUM:
-			Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL " " COLOR_NUM ">%d</font>", self->values.num);
+			Graphviz_drawPtrNode(gv, self,
+				"<font " FACE_TERMINAL " " COLOR_NUM ">%d</font>",
+				self->values.num);
 			break;
 		
 		case EXPR_NEG:
@@ -312,9 +314,10 @@ void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv) {
 				case EXPR_DIV: op_str = "/"; break;
 				
 				default:
-					assert(!"Invalid expression type");
+					ASSERT(!"Invalid expression type");
 			}
-			Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL ">%s</font>", op_str);
+			Graphviz_drawPtrNode(gv, self,
+				"<font " FACE_TERMINAL ">%s</font>", op_str);
 			
 			/* Draw expr a */
 			AST_Expr_drawGraph(self->values.binop.left, gv);
@@ -328,31 +331,36 @@ void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv) {
 		
 		case EXPR_CALL: {
 			/* Draw procedure name */
-			Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL ">call <font " COLOR_PROC ">%s</font></font>", self->values.call.ident);
+			Graphviz_drawPtrNode(gv, self,
+				"<font " FACE_TERMINAL ">call <font " COLOR_PROC ">%s</font></font>",
+				self->values.call.ident);
 			
 			/* Draw each parameter from the list as a direct child */
 			AST_ParamList* param_list = self->values.call.param_list;
 			if(param_list != NULL) {
-				size_t i;
-				for(i = 0; i < param_list->param_count; i++) {
-					AST_Expr_drawGraph(param_list->params[i], gv);
-					Graphviz_drawPtrEdge(gv, self, param_list->params[i]);
+				foreach(&param_list->params, pparam) {
+					AST_Expr_drawGraph(*pparam, gv);
+					Graphviz_drawPtrEdge(gv, self, *pparam);
 				}
 			}
 			break;
 		}
 		
 		default:
-			assert(!"Invalid expression type");
+			ASSERT(!"Invalid expression type");
 	}
 }
 
 static void Ident_drawGraph(char* ident, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, ident, "<font " FACE_TERMINAL " " COLOR_VAR ">%s</font>", ident);
+	Graphviz_drawPtrNode(gv, ident,
+		"<font " FACE_TERMINAL " " COLOR_VAR ">%s</font>",
+		ident);
 }
 
 static void Number_drawGraph(Word* pvalue, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, pvalue, "<font " FACE_TERMINAL " " COLOR_NUM ">%u</font>", *pvalue);
+	Graphviz_drawPtrNode(gv, pvalue,
+		"<font " FACE_TERMINAL " " COLOR_NUM ">%u</font>",
+		*pvalue);
 }
 
 static void Stmt_Assign_drawGraph(AST_Stmt* self, Graphviz* gv) {
@@ -369,15 +377,16 @@ static void Stmt_Assign_drawGraph(AST_Stmt* self, Graphviz* gv) {
 }
 
 static void Stmt_Call_drawGraph(AST_Stmt* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL ">call <font " COLOR_PROC ">%s</font></font>", self->stmt.call.ident);
+	Graphviz_drawPtrNode(gv, self,
+		"<font " FACE_TERMINAL ">call <font " COLOR_PROC ">%s</font></font>",
+		self->stmt.call.ident);
 	
 	/* Draw each parameter from the list as a direct child */
 	AST_ParamList* param_list = self->stmt.call.param_list;
 	if(param_list != NULL) {
-		size_t i;
-		for(i = 0; i < param_list->param_count; i++) {
-			AST_Expr_drawGraph(param_list->params[i], gv);
-			Graphviz_drawPtrEdge(gv, self, param_list->params[i]);
+		foreach(&param_list->params, pparam) {
+			AST_Expr_drawGraph(*pparam, gv);
+			Graphviz_drawPtrEdge(gv, self, *pparam);
 		}
 	}
 }
@@ -385,12 +394,10 @@ static void Stmt_Call_drawGraph(AST_Stmt* self, Graphviz* gv) {
 static void Stmt_Begin_drawGraph(AST_Stmt* self, Graphviz* gv) {
 	Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL ">begin</font>");
 	
-	size_t i;
-	for(i = 0; i < self->stmt.begin.stmt_count; i++) {
-		AST_Stmt* stmt = self->stmt.begin.stmts[i];
-		if(stmt != NULL) {
-			AST_Stmt_drawGraph(stmt, gv);
-			Graphviz_drawPtrEdge(gv, self, stmt);
+	foreach(&self->stmt.begin.stmts, pstmt) {
+		if(*pstmt != NULL) {
+			AST_Stmt_drawGraph(*pstmt, gv);
+			Graphviz_drawPtrEdge(gv, self, *pstmt);
 		}
 	}
 }
@@ -456,9 +463,13 @@ static void Stmt_While_drawGraph(AST_Stmt* self, Graphviz* gv) {
 }
 
 static void Stmt_Read_drawGraph(AST_Stmt* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL ">read <font " COLOR_VAR ">%s</font></font>", self->stmt.read.ident);
+	Graphviz_drawPtrNode(gv, self,
+		"<font " FACE_TERMINAL ">read <font " COLOR_VAR ">%s</font></font>",
+		self->stmt.read.ident);
 }
 
 static void Stmt_Write_drawGraph(AST_Stmt* self, Graphviz* gv) {
-	Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL ">write <font " COLOR_VAR ">%s</font></font>", self->stmt.write.ident);
+	Graphviz_drawPtrNode(gv, self,
+		"<font " FACE_TERMINAL ">write <font " COLOR_VAR ">%s</font></font>",
+		self->stmt.write.ident);
 }

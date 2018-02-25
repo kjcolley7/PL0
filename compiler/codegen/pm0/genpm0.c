@@ -20,14 +20,14 @@ static void GenPM0_optimize(GenPM0* self);
 static void GenPM0_layoutCode(GenPM0* self);
 static void vSemanticError(const char* fmt, va_list ap);
 static void semanticError(const char* fmt, ...);
-static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement);
-static bool genCond(Block* scope, BasicBlock** code, AST_Cond* condition);
-static bool genExpr(Block* scope, BasicBlock** code, AST_Expr* expression);
-static bool genNumber(Block* scope, BasicBlock** code, Word number);
-static bool genCall(Block* scope, BasicBlock** code, char* ident, AST_ParamList* param_list);
-static bool genParamList(Block* scope, BasicBlock** code, AST_ParamList* param_list);
-static bool genLoadIdent(Block* scope, BasicBlock** code, char* ident);
-static bool genStoreVar(Block* scope, BasicBlock** code, char* ident);
+static bool genStmt(SymTree* scope, BasicBlock** code, AST_Stmt* statement);
+static bool genCond(SymTree* scope, BasicBlock** code, AST_Cond* condition);
+static bool genExpr(SymTree* scope, BasicBlock** code, AST_Expr* expression);
+static bool genNumber(SymTree* scope, BasicBlock** code, Word number);
+static bool genCall(SymTree* scope, BasicBlock** code, char* ident, AST_ParamList* param_list);
+static bool genParamList(SymTree* scope, BasicBlock** code, AST_ParamList* param_list);
+static bool genLoadIdent(SymTree* scope, BasicBlock** code, char* ident);
+static bool genStoreVar(SymTree* scope, BasicBlock** code, char* ident);
 
 
 static void vSemanticError(const char* fmt, va_list ap) {
@@ -126,27 +126,17 @@ void GenPM0_emit(GenPM0* self, FILE* fp) {
 }
 
 
-bool GenPM0_genBlock(Block* scope, AST_Block* ast) {
-	BasicBlock* entrypoint = BasicBlock_new();
-	BasicBlock* cur = entrypoint;
-	
+bool GenPM0_genBlock(SymTree* scope, BasicBlock** code, AST_Block* ast) {
 	/* Produce an INC if we need to modify the stack space */
-	if(scope->symtree->frame_size != 0) {
-		BasicBlock_addInsn(cur, MAKE_INC(scope->symtree->frame_size));
+	if(scope->frame_size != 0) {
+		BasicBlock_addInsn(*code, MAKE_INC(scope->frame_size));
 	}
 	
 	/* Generate code for the statements contained in the block */
-	bool success = genStmt(scope, &cur, ast->stmt);
-	if(!success) {
-		release(&entrypoint);
-		return false;
-	}
-	
-	scope->code = entrypoint;
-	return true;
+	return genStmt(scope, code, ast->stmt);
 }
 
-static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement) {
+static bool genStmt(SymTree* scope, BasicBlock** code, AST_Stmt* statement) {
 	/* Empty statement, so do nothing and return success */
 	if(!statement) {
 		return true;
@@ -167,10 +157,9 @@ static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement) {
 			return genCall(scope, code, statement->stmt.call.ident, statement->stmt.call.param_list);
 			
 		case STMT_BEGIN: {
-			size_t i;
-			for(i = 0; i < statement->stmt.begin.stmt_count; i++) {
+			foreach(&statement->stmt.begin.stmts, pstmt) {
 				/* Generate the code for each statement */
-				if(!genStmt(scope, code, statement->stmt.begin.stmts[i])) {
+				if(!genStmt(scope, code, *pstmt)) {
 					return false;
 				}
 			}
@@ -277,11 +266,11 @@ static bool genStmt(Block* scope, BasicBlock** code, AST_Stmt* statement) {
 			return true;
 			
 		default:
-			abort();
+			ASSERT(!"Unknown statement type");
 	}
 }
 
-static bool genCond(Block* scope, BasicBlock** code, AST_Cond* condition) {
+static bool genCond(SymTree* scope, BasicBlock** code, AST_Cond* condition) {
 	/* Store the start of the condition in the basic block for optimizations later */
 	BasicBlock_markCondition(*code);
 	
@@ -305,7 +294,7 @@ static bool genCond(Block* scope, BasicBlock** code, AST_Cond* condition) {
 		case COND_GE: cond_insn = MAKE_GEQ(); break;
 			
 		default:
-			abort();
+			ASSERT(!"Unknown condition type");
 	}
 	
 	/* Create code for the first operand of the conditional operator */
@@ -323,7 +312,7 @@ static bool genCond(Block* scope, BasicBlock** code, AST_Cond* condition) {
 	return true;
 }
 
-static bool genExpr(Block* scope, BasicBlock** code, AST_Expr* expression) {
+static bool genExpr(SymTree* scope, BasicBlock** code, AST_Expr* expression) {
 	Insn expr_insn;
 	switch(expression->type) {
 		case EXPR_VAR:
@@ -354,7 +343,7 @@ static bool genExpr(Block* scope, BasicBlock** code, AST_Expr* expression) {
 			return true;
 			
 		default:
-			abort();
+			ASSERT(!"Unknown expression type");
 	}
 	
 	/* Only binary operators execute this code */
@@ -374,16 +363,16 @@ static bool genExpr(Block* scope, BasicBlock** code, AST_Expr* expression) {
 	return true;
 }
 
-static bool genNumber(Block* scope, BasicBlock** code, Word number) {
+static bool genNumber(SymTree* scope, BasicBlock** code, Word number) {
 	/* The scope variable is not necessary, so it is ignored */
 	(void)scope;
 	BasicBlock_addInsn(*code, MAKE_LIT(number));
 	return true;
 }
 
-static bool genCall(Block* scope, BasicBlock** code, char* ident, AST_ParamList* param_list) {
+static bool genCall(SymTree* scope, BasicBlock** code, char* ident, AST_ParamList* param_list) {
 	/* Lookup the procedure symbol by name */
-	Symbol* sym = SymTree_findSymbol(scope->symtree, ident);
+	Symbol* sym = SymTree_findSymbol(scope, ident);
 	if(sym == NULL) {
 		semanticError("Tried to call procedure \"%s\" which isn't declared at this scope", ident);
 		return false;
@@ -403,9 +392,9 @@ static bool genCall(Block* scope, BasicBlock** code, char* ident, AST_ParamList*
 	return true;
 }
 
-static bool genParamList(Block* scope, BasicBlock** code, AST_ParamList* param_list) {
+static bool genParamList(SymTree* scope, BasicBlock** code, AST_ParamList* param_list) {
 	/* No need to adjust the stack at all if the parameter list is empty */
-	if(param_list->param_count == 0) {
+	if(param_list->params.count == 0) {
 		return true;
 	}
 	
@@ -413,21 +402,20 @@ static bool genParamList(Block* scope, BasicBlock** code, AST_ParamList* param_l
 	BasicBlock_addInsn(*code, MAKE_INC(4));
 	
 	/* Generate the code to produce the value of all parameters */
-	size_t i;
-	for(i = 0; i < param_list->param_count; i++) {
-		if(!genExpr(scope, code, param_list->params[i])) {
+	foreach(&param_list->params, pparam) {
+		if(!genExpr(scope, code, *pparam)) {
 			return false;
 		}
 	}
 	
 	/* Adjust the stack pointer back to where it was before we first adjusted it */
-	BasicBlock_addInsn(*code, MAKE_INC(-(4 + (Word)param_list->param_count)));
+	BasicBlock_addInsn(*code, MAKE_INC(-(4 + (Word)param_list->params.count)));
 	return true;
 }
 
-static bool genLoadIdent(Block* scope, BasicBlock** code, char* ident) {
+static bool genLoadIdent(SymTree* scope, BasicBlock** code, char* ident) {
 	/* Lookup the symbol by its name */
-	Symbol* sym = SymTree_findSymbol(scope->symtree, ident);
+	Symbol* sym = SymTree_findSymbol(scope, ident);
 	if(sym == NULL) {
 		semanticError("Symbol \"%s\" used but not declared", ident);
 		return false;
@@ -455,13 +443,13 @@ static bool genLoadIdent(Block* scope, BasicBlock** code, char* ident) {
 		}
 			
 		default:
-			abort();
+			ASSERT(!"Unknown symbol type");
 	}
 }
 
-static bool genStoreVar(Block* scope, BasicBlock** code, char* ident) {
+static bool genStoreVar(SymTree* scope, BasicBlock** code, char* ident) {
 	/* Lookup the symbol for the variable in the assignment */
-	Symbol* sym = SymTree_findSymbol(scope->symtree, ident);
+	Symbol* sym = SymTree_findSymbol(scope, ident);
 	if(sym == NULL) {
 		semanticError("Tried to modify variable \"%s\" before it was declared", ident);
 		return false;
@@ -487,6 +475,6 @@ static bool genStoreVar(Block* scope, BasicBlock** code, char* ident) {
 		}
 			
 		default:
-			abort();
+			ASSERT(!"Unknown symbol type");
 	}
 }

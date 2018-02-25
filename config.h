@@ -34,6 +34,8 @@
 
 /* Data type used for storing memory words on PM/0 architecture */
 typedef int32_t Word;
+#define WORD_MIN INT32_MIN
+#define WORD_MAX INT32_MAX
 
 /* Represents an address that is currently undefined */
 #define ADDR_UND ((Word)-1)
@@ -48,6 +50,7 @@ typedef int32_t Word;
 #define IO_COLOR    "brown"
 #define LIT_COLOR   "dodgerblue"
 #define INC_COLOR   "tan"
+#define ERR_COLOR   "deeppink"
 
 /* Colors and fonts for AST nodes */
 #define NONTERMINAL_FONT  "Times-Italic"

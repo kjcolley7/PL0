@@ -21,10 +21,10 @@ struct GVNode {
 	
 	char* node_id;
 	
-	size_t attr_count;
-	size_t attr_cap;
-	char** attr_names;
-	char** attr_values;
+	dynamic_array(struct {
+		char* name;
+		char* value;
+	}) attrs;
 };
 DECL(GVNode);
 

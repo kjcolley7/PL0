@@ -27,8 +27,7 @@ Graphviz* Graphviz_initWithFile(Graphviz* self, FILE* fout, const char* name, ..
 Graphviz* Graphviz_vInitWithFile(Graphviz* self, FILE* fout, const char* name, va_list ap) {
 	if((self = Graphviz_init(self))) {
 		self->output.fout = fout;
-		char* graphname;
-		vasprintf_ff(&graphname, name, ap);
+		char* graphname = vrsprintf_ff(name, ap);
 		Graphviz_printf(self, "digraph %s {\n", graphname);
 		destroy(&graphname);
 	}
@@ -45,8 +44,7 @@ Graphviz* Graphviz_vInitWithParentGraph(Graphviz* self, Graphviz* parent, const 
 	if((self = Graphviz_init(self))) {
 		self->subgraph = true;
 		self->output.gv = parent;
-		char* graphname;
-		vasprintf_ff(&graphname, name, ap);
+		char* graphname = vrsprintf_ff(name, ap);
 		Graphviz_draw(parent, "subgraph %s {", graphname);
 		destroy(&graphname);
 	}
@@ -92,8 +90,7 @@ void Graphviz_drawNode(Graphviz* self, const char* id, const char* fmt, ...) {
 	});
 }
 void Graphviz_vDrawNode(Graphviz* self, const char* id, const char* fmt, va_list ap) {
-	char* label;
-	vasprintf_ff(&label, fmt, ap);
+	char* label = vrsprintf_ff(fmt, ap);
 	Graphviz_draw(self, "<%s> [label = <%s>];", id, label);
 	destroy(&label);
 }
@@ -104,8 +101,7 @@ void Graphviz_drawPtrNode(Graphviz* self, void* obj, const char* fmt, ...) {
 	});
 }
 void Graphviz_vDrawPtrNode(Graphviz* self, void* obj, const char* fmt, va_list ap) {
-	char* label;
-	vasprintf_ff(&label, fmt, ap);
+	char* label = vrsprintf_ff(fmt, ap);
 	Graphviz_draw(self, "<%p> [label = <%s>];", obj, label);
 	destroy(&label);
 }

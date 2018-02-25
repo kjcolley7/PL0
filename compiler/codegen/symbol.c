@@ -27,7 +27,9 @@ static const char* Symbol_getType(Symbol* self) {
 		case SYM_CONST: return "const";
 		case SYM_VAR:   return "var";
 		case SYM_PROC:  return "proc";
-		default:        return "INVALID";
+		
+		default:
+			ASSERT(!"Unknown symbol type");
 	}
 }
 
@@ -43,6 +45,6 @@ static Word Symbol_getValue(Symbol* self) {
 			return Block_getAddress(self->value.procedure.body);
 		
 		default:
-			abort();
+			ASSERT(!"Unknown symbol type");
 	}
 }

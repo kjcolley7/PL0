@@ -14,34 +14,26 @@
 #include <stdbool.h>
 
 typedef struct BasicBlock BasicBlock;
+typedef uint8_t BBFlags;
+const static BBFlags BB_HAS_CONDITION     = 1<<0;
+const static BBFlags BB_HAS_TAIL          = 1<<1;
+const static BBFlags BB_INVERT_CONDITION  = 1<<2;
 
 #include "object.h"
 #include "config.h"
 #include "instruction.h"
-#include "symbol.h"
+#include "compiler/codegen/symbol.h"
 #include "block.h"
 #include "graphviz.h"
 
 struct BasicBlock {
 	OBJECT_BASE;
 	
-	/*! Code address of the basic block */
-	Word code_addr;
+	/*! Array of instructions in this basic block */
+	dynamic_array(Insn) insns;
 	
-	/*! Number of instructions in this basic block */
-	Word insn_count;
-	
-	/*! Allocated capacity of instructions */
-	Word insn_cap;
-	
-	/*! Array of instructions */
-	Insn* insns;
-	
-	/*! Whether the basic block ends in a conditional branch */
-	bool conditional;
-	
-	/*! Index of the first instruction of the condition code, or -1 if there is no condition */
-	Word cond_index;
+	/*! Index of the first instruction of the condition code */
+	size_t cond_index;
 	
 	/*! Target of the branch from this basic block when the condition is true (or unconditional) */
 	BasicBlock* target;
@@ -55,32 +47,23 @@ struct BasicBlock {
 	/*! Basic block that precedes this one in code */
 	BasicBlock* prev;
 	
-	/*! Number of symbols referenced by this basic block */
-	size_t sym_count;
-	
-	/*! Allocated capacity for symbols */
-	size_t sym_cap;
-	
 	/*! Array of symbols referenced by this basic block */
-	Symbol** syms;
+	dynamic_array(struct {
+		Symbol* sym;   /*!< Symbol referenced by this basic block */
+		size_t index;  /*!< Index of the instruction which references this symbol */
+	}) symrefs;
 	
-	/*! Indices of the instructions which reference these symbols */
-	Word* sym_indices;
+	/*! Array of code cross references to this basic block */
+	dynamic_array(BasicBlock*) coderefs;
 	
-	/*! Number of cross references to this basic block */
-	size_t xref_count;
+	/*! Index where the control flow code begins */
+	size_t tail_index;
 	
-	/*! Allocated capacity for cross references */
-	size_t xref_cap;
+	/*! Code address of the basic block */
+	Word code_addr;
 	
-	/*! Array of cross references to this basic block */
-	BasicBlock** xrefs;
-	
-	/*! Index where the control flow code begins, or -1 if the tail doesn't exist */
-	Word tail_index;
-	
-	/*! Whether the condition instruction should be inverted */
-	bool invert_cond;
+	/*! Flags for this basic block */
+	BBFlags flags;
 };
 DECL(BasicBlock);
 
@@ -160,7 +143,7 @@ void BasicBlock_optimize(BasicBlock* self);
 void BasicBlock_emit(BasicBlock* self, FILE* fp, uint16_t level);
 
 /*! Count the number of instructions in this basic block including trailing jumps */
-Word BasicBlock_getInstructionCount(BasicBlock* self);
+size_t BasicBlock_getInstructionCount(BasicBlock* self);
 
 /*! Draws the basic block as a node */
 void BasicBlock_drawGraph(BasicBlock* self, Graphviz* gv, uint16_t level);

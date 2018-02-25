@@ -24,43 +24,31 @@ Destroyer(AST_Block) {
 DEF(AST_Block);
 
 Destroyer(AST_ConstDecls) {
-	size_t i;
-	for(i = 0; i < self->const_count; i++) {
-		destroy(&self->idents[i]);
+	foreach(&self->consts, pconst) {
+		destroy(&pconst->ident);
 	}
-	
-	destroy(&self->idents);
-	destroy(&self->values);
+	clear_array(&self->consts);
 }
 DEF(AST_ConstDecls);
 
 Destroyer(AST_ParamDecls) {
-	size_t i;
-	for(i = 0; i < self->param_count;i++) {
-		destroy(&self->params[i]);
-	}
-	
-	destroy(&self->params);
+	destroy_array(&self->params);
 }
 DEF(AST_ParamDecls);
 
 Destroyer(AST_VarDecls) {
-	size_t i;
-	for(i = 0; i < self->var_count; i++) {
-		destroy(&self->vars[i]);
+	foreach(&self->vars, pvar) {
+		destroy(pvar);
 	}
-	
-	destroy(&self->vars);
+	clear_array(&self->vars);
 }
 DEF(AST_VarDecls);
 
 Destroyer(AST_ProcDecls) {
-	size_t i;
-	for(i = 0; i < self->proc_count; i++) {
-		release(&self->procs[i]);
+	foreach(&self->procs, pproc) {
+		release(pproc);
 	}
-
-	destroy(&self->procs);
+	clear_array(&self->procs);
 }
 DEF(AST_ProcDecls);
 
@@ -86,11 +74,7 @@ Destroyer(AST_Stmt) {
 			break;
 		
 		case STMT_BEGIN: {
-			size_t i;
-			for(i = 0; i < self->stmt.begin.stmt_count; i++) {
-				release(&self->stmt.begin.stmts[i]);
-			}
-			destroy(&self->stmt.begin.stmts);
+			release_array(&self->stmt.begin.stmts);
 			break;
 		}
 		
@@ -114,7 +98,7 @@ Destroyer(AST_Stmt) {
 			break;
 		
 		default:
-			assert(!"Invalid statement type");
+			ASSERT(!"Invalid statement type");
 	}
 }
 DEF(AST_Stmt);
@@ -139,7 +123,7 @@ Destroyer(AST_Cond) {
 			break;
 		
 		default:
-			assert(!"Invalid condition type");
+			ASSERT(!"Invalid condition type");
 	}
 }
 DEF(AST_Cond);
@@ -174,17 +158,13 @@ Destroyer(AST_Expr) {
 			break;
 		
 		default:
-			assert(!"Invalid expression type");
+			ASSERT(!"Invalid expression type");
 	}
 }
 DEF(AST_Expr);
 
 Destroyer(AST_ParamList) {
-	size_t i;
-	for(i = 0; i < self->param_count; i++) {
-		release(&self->params[i]);
-	}
-	destroy(&self->params);
+	release_array(&self->params);
 }
 DEF(AST_ParamList);
 
@@ -216,17 +196,12 @@ AST_ConstDecls* AST_ConstDecls_append(AST_ConstDecls* self, char* ident, Word va
 		self = AST_ConstDecls_new();
 	}
 	
-	/* Enlarge consts array if necessary */
-	if(self->const_count == self->const_cap) {
-		/* Enlarge both allocations */
-		size_t oldcap = self->const_cap;
-		expand(&self->idents, &oldcap);
-		expand(&self->values, &self->const_cap);
-	}
-	
 	/* Append value */
-	self->idents[self->const_count] = ident;
-	self->values[self->const_count++] = value;
+	element_type(self->consts) newConst = {
+		.ident = ident,
+		.value = value
+	};
+	append(&self->consts, newConst);
 	return self;
 }
 
@@ -240,13 +215,8 @@ AST_VarDecls* AST_VarDecls_append(AST_VarDecls* self, char* ident) {
 		self = AST_VarDecls_new();
 	}
 	
-	/* Enlarge vars array if necessary */
-	if(self->var_count == self->var_cap) {
-		expand(&self->vars, &self->var_cap);
-	}
-	
 	/* Append variable */
-	self->vars[self->var_count++] = ident;
+	append(&self->vars, ident);
 	return self;
 }
 
@@ -262,19 +232,14 @@ AST_ProcDecls* AST_ProcDecls_append(AST_ProcDecls* self, char* ident, AST_ParamD
 		self = AST_ProcDecls_new();
 	}
 	
-	/* Enlarge procs array if necessary */
-	if(self->proc_count == self->proc_cap) {
-		expand(&self->procs, &self->proc_cap);
-	}
-	
 	/* Build proc object */
 	AST_Proc* proc = AST_Proc_new();
 	proc->ident = ident;
 	proc->param_decls = param_decls;
 	proc->body = body;
 	
-	/* Append variable */
-	self->procs[self->proc_count++] = proc;
+	/* Append procedure declaration object */
+	append(&self->procs, proc);
 	return self;
 }
 
@@ -288,13 +253,8 @@ AST_ParamDecls* AST_ParamDecls_append(AST_ParamDecls* self, char* ident) {
 		self = AST_ParamDecls_new();
 	}
 	
-	/* Enlarge params array if necessary */
-	if(self->param_count == self->param_cap) {
-		expand(&self->params, &self->param_cap);
-	}
-	
 	/* Append parameter */
-	self->params[self->param_count++] = ident;
+	append(&self->params, ident);
 	return self;
 }
 
@@ -343,7 +303,7 @@ AST_Stmt* AST_Stmt_create(STMT_TYPE type, ...) {
 				break;
 			
 			default:
-				assert(!"Invalid statement type");
+				ASSERT(!"Invalid statement type");
 		}
 		
 		return ret;
@@ -368,15 +328,10 @@ AST_Stmt* AST_Stmt_append(AST_Stmt* self, AST_Stmt* stmt) {
 	}
 	
 	/* Must be a begin statement */
-	assert(self->type == STMT_BEGIN);
-	
-	/* Enlarge stmts array if necessary */
-	if(self->stmt.begin.stmt_count == self->stmt.begin.stmt_cap) {
-		expand(&self->stmt.begin.stmts, &self->stmt.begin.stmt_cap);
-	}
+	ASSERT(self->type == STMT_BEGIN);
 	
 	/* Append statement to array */
-	self->stmt.begin.stmts[self->stmt.begin.stmt_count++] = stmt;
+	append(&self->stmt.begin.stmts, stmt);
 	return self;
 }
 
@@ -406,7 +361,7 @@ AST_Cond* AST_Cond_create(COND_TYPE type, ...) {
 				break;
 			
 			default:
-				assert(!"Invalid condition type");
+				ASSERT(!"Invalid condition type");
 		}
 		
 		return ret;
@@ -450,7 +405,7 @@ AST_Expr* AST_Expr_create(EXPR_TYPE type, ...) {
 				break;
 			
 			default:
-				assert(!"Invalid expression type");
+				ASSERT(!"Invalid expression type");
 		}
 		
 		return ret;
@@ -470,7 +425,7 @@ AST_Expr* AST_Expr_applyUnaryOperator(AST_Expr* self, EXPR_TYPE unary_op) {
 			return AST_Expr_create(EXPR_NEG, self);
 		
 		default:
-			abort();
+			ASSERT(!"Unexpected expression type");
 	}
 }
 
@@ -484,12 +439,7 @@ AST_ParamList* AST_ParamList_append(AST_ParamList* self, AST_Expr* expr) {
 		self = AST_ParamList_new();
 	}
 	
-	/* Enlarge params array if necessary */
-	if(self->param_count == self->param_cap) {
-		expand(&self->params, &self->param_cap);
-	}
-	
 	/* Append expression to array */
-	self->params[self->param_count++] = expr;
+	append(&self->params, expr);
 	return self;
 }

@@ -28,14 +28,8 @@ struct State {
 	/* Label for the current state */
 	char* label;
 	
-	/*! Number of transitions leading from this state to another */
-	size_t transition_count;
-	
-	/*! Allocated capacity for state transitions */
-	size_t transition_cap;
-	
-	/*! Allocated array of state transitions */
-	Transition** transitions;
+	/*! Dynamic array of state transitions */
+	dynamic_array(Transition*) transitions;
 	
 	/*! Whether the state is an acceptor state */
 	bool acceptor;

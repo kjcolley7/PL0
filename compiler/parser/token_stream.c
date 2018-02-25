@@ -49,7 +49,7 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 	else {
 		/* Need to read a token from the tokenlist file */
 		token_type type;
-		char lexeme[12] = {0};
+		char lexeme[12] = {};
 		
 		/* Read in the token type and its lexeme */
 		int val;
@@ -131,7 +131,7 @@ int yylex(YYSTYPE* lvalp, yyscan_t scanner) {
 	int ret = tok->type;
 	switch(tok->type) {
 		case identsym:
-			lvalp->ident = strdup(tok->lexeme);
+			lvalp->ident = strdup_ff(tok->lexeme);
 			break;
 		
 		case numbersym:

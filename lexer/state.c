@@ -13,13 +13,7 @@
 
 Destroyer(State) {
 	destroy(&self->label);
-	
-	size_t i;
-	for(i = 0; i < self->transition_count; i++) {
-		release(&self->transitions[i]);
-	}
-	
-	destroy(&self->transitions);
+	release_array(&self->transitions);
 }
 DEF(State);
 
@@ -58,22 +52,15 @@ void State_addTransition(State* self, Transition* trans) {
 		return;
 	}
 	
-	/* Enlarge transition array if necessary */
-	if(self->transition_count == self->transition_cap) {
-		expand(&self->transitions, &self->transition_cap);
-	}
-	
 	/* Add the new transition */
-	self->transitions[self->transition_count++] = retain(trans);
+	append(&self->transitions, retain(trans));
 }
 
 State* State_transition(State* self, char c) {
-	size_t i;
-	for(i = 0; i < self->transition_count; i++) {
-		Transition* trans = self->transitions[i];
-		bool match = trans->matcher ? trans->matcher(c) : trans->exact == c;
+	foreach(&self->transitions, ptrans) {
+		bool match = (*ptrans)->matcher ? (*ptrans)->matcher(c) : (*ptrans)->exact == c;
 		if(match) {
-			return trans->state;
+			return (*ptrans)->state;
 		}
 	}
 	
@@ -86,8 +73,7 @@ void State_drawGraph(State* self, Graphviz* gv) {
 	Graphviz_draw(gv, "<%p> [label = <%s>, shape = %s];", self, self->label ?: " ", shape);
 	
 	/* Draw all transitions */
-	size_t i;
-	for(i = 0; i < self->transition_count; i++) {
-		Transition_drawGraph(self->transitions[i], gv, self);
+	foreach(&self->transitions, ptrans) {
+		Transition_drawGraph(*ptrans, gv, self);
 	}
 }

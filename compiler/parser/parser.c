@@ -71,7 +71,7 @@ bool Parser_parseProgram(Parser* self, AST_Block** program) {
 #endif /* WITH_BISON */
 			
 		default:
-			assert(!"Unknown parser type");
+			ASSERT(!"Unknown parser type");
 	}
 }
 
@@ -83,10 +83,9 @@ static void vSyntaxError(const char* fmt, va_list ap) {
 }
 
 static void syntaxError(const char* fmt, ...) {
-	va_list ap;
-	va_start(ap, fmt);
-	vSyntaxError(fmt, ap);
-	va_end(ap);
+	VARIADIC(fmt, ap, {
+		vSyntaxError(fmt, ap);
+	});
 }
 
 
@@ -165,16 +164,11 @@ static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls) {
 		/* This will consume "const" on first loop and separating commas after that */
 		TokenStream_consumeToken(self->token_stream);
 		
-		/* Enlarge consts array if necessary */
-		if(consts->const_count == consts->const_cap) {
-			/* Enlarge both allocations */
-			size_t oldcap = consts->const_cap;
-			expand(&consts->idents, &oldcap);
-			expand(&consts->values, &consts->const_cap);
-		}
+		/* Build the new constant that will be appended to the array */
+		element_type(consts->consts) newConst;
 		
 		/* Parse name of constant being defined */
-		if(!Parser_parseIdent(self, &consts->idents[consts->const_count])) {
+		if(!Parser_parseIdent(self, &newConst.ident)) {
 			syntaxError("Expected identifier in constant declaration");
 			release(&consts);
 			return false;
@@ -193,12 +187,13 @@ static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls) {
 		}
 		TokenStream_consumeToken(self->token_stream);
 		
-		/* Parse value of constant being defined */
-		if(!Parser_parseNumber(self, &consts->values[consts->const_count++])) {
+		/* Parse value of constant being defined and append it to the array */
+		if(!Parser_parseNumber(self, &newConst.value)) {
 			syntaxError("Expected number after \"=\" in constant declaration");
 			release(&consts);
 			return false;
 		}
+		append(&consts->consts, newConst);
 	} while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == commasym);
 	
 	/* Consume ";" */
@@ -240,17 +235,14 @@ static bool Parser_parseVarDecls(Parser* self, AST_VarDecls** var_decls) {
 		/* This will consume "var" on first loop and separating commas after that */
 		TokenStream_consumeToken(self->token_stream);
 		
-		/* Enlarge consts array if necessary */
-		if(vars->var_count == vars->var_cap) {
-			expand(&vars->vars, &vars->var_cap);
-		}
-		
-		/* Parse name of variable being declared */
-		if(!Parser_parseIdent(self, &vars->vars[vars->var_count++])) {
+		/* Parse name of variable being declared and append it to the array */
+		char* var;
+		if(!Parser_parseIdent(self, &var)) {
 			syntaxError("Expected identifier in variable declaration");
 			release(&vars);
 			return false;
 		}
+		append(&vars->vars, var);
 	} while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == commasym);
 	
 	/* Consume ";" */
@@ -283,16 +275,13 @@ static bool Parser_parseProcDecls(Parser* self, AST_ProcDecls** proc_decls) {
 	
 	/* Parse procedures as long as we see "procedure" */
 	while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == procsym) {
-		/* Expand array if necessary */
-		if(procs->proc_count == procs->proc_cap) {
-			expand(&procs->procs, &procs->proc_cap);
-		}
-		
 		/* Parse a procedure and append it to the array */
-		if(!Parser_parseProc(self, &procs->procs[procs->proc_count++])) {
+		AST_Proc* proc;
+		if(!Parser_parseProc(self, &proc)) {
 			release(&procs);
 			return false;
 		}
+		append(&procs->procs, proc);
 	}
 
 	*proc_decls = procs;
@@ -312,7 +301,7 @@ static bool Parser_parseProc(Parser* self, AST_Proc** procedure) {
 	/* Consume "procedure" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != procsym) {
 		/* Shouldn't be possible */
-		abort();
+		ASSERT(!"Failed to consume \"procedure\"");
 	}
 	TokenStream_consumeToken(self->token_stream);
 	
@@ -375,35 +364,29 @@ static bool Parser_parseParamDecls(Parser* self, AST_ParamDecls** param_decls) {
 	
 	/* Check if there are any parameters to parse */
 	if(TokenStream_peekToken(self->token_stream, &tok) && tok->type != rparentsym) {
-		/* Enlarge array if necessary */
-		if(params->param_count == params->param_cap) {
-			expand(&params->params, &params->param_cap);
-		}
-		
-		/* Parse name of first parameter */
-		if(!Parser_parseIdent(self, &params->params[params->param_count++])) {
+		/* Parse name of first parameter and append it to the array */
+		char* param;
+		if(!Parser_parseIdent(self, &param)) {
 			syntaxError("Expected identifier for first parameter in parameter declarations list");
 			release(&params);
 			return false;
 		}
+		append(&params->params, param);
 		
 		/* Keep going as long as we have another parameter to parse */
 		while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == commasym) {
 			/* Consume "," */
 			TokenStream_consumeToken(self->token_stream);
 			
-			/* Enlarge array if necessary */
-			if(params->param_count == params->param_cap) {
-				expand(&params->params, &params->param_cap);
-			}
-			
-			/* Parse name of next parameter */
-			if(!Parser_parseIdent(self, &params->params[params->param_count++])) {
-				syntaxError("Expected identifier for parameter %zu in parameter declarations list",
-							params->param_count);
+			/* Parse name of next parameter and append it to the array */
+			if(!Parser_parseIdent(self, &param)) {
+				syntaxError(
+					"Expected identifier for parameter %zu in parameter declarations list",
+					params->params.count);
 				release(&params);
 				return false;
 			}
+			append(&params->params, param);
 		}
 	}
 	
@@ -642,7 +625,7 @@ static bool Parser_parseFactor(Parser* self, AST_Expr** factor) {
 			char* ident;
 			if(!Parser_parseIdent(self, &ident)) {
 				/* Shouldn't be possible */
-				abort();
+				ASSERT(!"Failed to parse identifier");
 			}
 			fact = AST_Expr_create(EXPR_VAR, ident);
 			break;
@@ -652,7 +635,7 @@ static bool Parser_parseFactor(Parser* self, AST_Expr** factor) {
 			Word number;
 			if(!Parser_parseNumber(self, &number)) {
 				/* Shouldn't be possible */
-				abort();
+				ASSERT(!"Failed to parse number");
 			}
 			fact = AST_Expr_create(EXPR_NUM, number);
 			break;
@@ -710,12 +693,12 @@ static bool Parser_parseNumber(Parser* self, Word* number) {
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != numbersym) {
 		return false;
 	}
-	assert(strlen(tok->lexeme) <= 5);
+	ASSERT(strlen(tok->lexeme) <= 5);
 	
 	/* Convert the lexeme into an unsigned integer and store it in the number node */
 	char* end;
 	*number = (Word)strtoul(tok->lexeme, &end, 10);
-	assert(end == tok->lexeme + strlen(tok->lexeme));
+	ASSERT(end == tok->lexeme + strlen(tok->lexeme));
 	
 	/* Consume the number token */
 	TokenStream_consumeToken(self->token_stream);
@@ -735,7 +718,7 @@ static bool Parser_parseIdent(Parser* self, char** identifier) {
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != identsym) {
 		return false;
 	}
-	assert(strlen(tok->lexeme) <= 11);
+	ASSERT(strlen(tok->lexeme) <= 11);
 	
 	/* Copy the identifier's name into the identifier and consume the token */
 	*identifier = strdup_ff(tok->lexeme);
@@ -794,35 +777,29 @@ static bool Parser_parseParamList(Parser* self, AST_ParamList** param_list) {
 	
 	/* Check if there are any parameters to parse */
 	if(TokenStream_peekToken(self->token_stream, &tok) && tok->type != rparentsym) {
-		/* Enlarge array if necessary */
-		if(paramList->param_count == paramList->param_cap) {
-			expand(&paramList->params, &paramList->param_cap);
-		}
-		
 		/* Parse expression for first parameter */
-		if(!Parser_parseExpr(self, &paramList->params[paramList->param_count++])) {
+		AST_Expr* param;
+		if(!Parser_parseExpr(self, &param)) {
 			syntaxError("Expected expression for first parameter in parameter list");
 			release(&paramList);
 			return false;
 		}
+		append(&paramList->params, param);
 		
 		/* Keep going as long as we have another parameter to parse */
 		while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == commasym) {
 			/* Consume "," */
 			TokenStream_consumeToken(self->token_stream);
 			
-			/* Enlarge array if necessary */
-			if(paramList->param_count == paramList->param_cap) {
-				expand(&paramList->params, &paramList->param_cap);
-			}
-			
 			/* Parse expression for next parameter */
-			if(!Parser_parseExpr(self, &paramList->params[paramList->param_count++])) {
-				syntaxError("Expected expression for parameter %zu in parameter list",
-					paramList->param_count);
+			if(!Parser_parseExpr(self, &param)) {
+				syntaxError(
+					"Expected expression for parameter %zu in parameter list",
+					paramList->params.count);
 				release(&paramList);
 				return false;
 			}
+			append(&paramList->params, param);
 		}
 	}
 	
@@ -852,7 +829,7 @@ static bool Parser_parseStmtAssign(Parser* self, AST_Stmt** assign_statement) {
 	/* Parse the name of the variable */
 	if(!Parser_parseIdent(self, &ident)) {
 		/* Shouldn't be possible */
-		abort();
+		ASSERT(!"Failed to parse indentifier");
 	}
 	
 	/* Read and consume the := token */
@@ -888,7 +865,7 @@ static bool Parser_parseStmtCall(Parser* self, AST_Stmt** call_statement) {
 	/* Consume "call" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != callsym) {
 		/* Shouldn't be possible */
-		abort();
+		ASSERT(!"Failed to consume \"call\"");
 	}
 	TokenStream_consumeToken(self->token_stream);
 	
@@ -920,13 +897,13 @@ static bool Parser_parseStmtCall(Parser* self, AST_Stmt** call_statement) {
 static bool Parser_parseStmtBegin(Parser* self, AST_Stmt** begin_statement) {
 	*begin_statement = NULL;
 	Token* tok;
-	AST_Stmt* begin = AST_Stmt_create(STMT_BEGIN);
+	AST_Stmt* begin = NULL;
 	AST_Stmt* stmt;
 	
 	/* Peek for "begin" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != beginsym) {
 		/* Shouldn't be possible */
-		abort();
+		ASSERT(!"Failed to peek \"begin\"");
 	}
 	
 	/* Keep parsing statements as long as we have a semicolon to separate them */
@@ -941,7 +918,7 @@ static bool Parser_parseStmtBegin(Parser* self, AST_Stmt** begin_statement) {
 		}
 		
 		/* Append statement to begin statement */
-		AST_Stmt_append(begin, stmt);
+		begin = AST_Stmt_append(begin, stmt);
 	} while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == semicolonsym);
 	
 	/* Consume "end" */
@@ -971,7 +948,7 @@ static bool Parser_parseStmtIf(Parser* self, AST_Stmt** if_statement) {
 	/* Consume "if" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != ifsym) {
 		/* Shouldn't be possible */
-		abort();
+		ASSERT(!"Failed to consume \"if\"");
 	}
 	TokenStream_consumeToken(self->token_stream);
 	
@@ -1029,7 +1006,7 @@ static bool Parser_parseStmtWhile(Parser* self, AST_Stmt** while_statement) {
 	/* Consume "while" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != whilesym) {
 		/* Shouldn't be possible */
-		abort();
+		ASSERT(!"Failed to consume \"while\"");
 	}
 	TokenStream_consumeToken(self->token_stream);
 	
@@ -1072,7 +1049,7 @@ static bool Parser_parseStmtRead(Parser* self, AST_Stmt** read_statement) {
 	/* Consume "read" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != readsym) {
 		/* Shouldn't be possible */
-		abort();
+		ASSERT(!"Failed to consume \"read\"");
 	}
 	TokenStream_consumeToken(self->token_stream);
 	
@@ -1100,7 +1077,7 @@ static bool Parser_parseStmtWrite(Parser* self, AST_Stmt** write_statement) {
 	/* Consume "write" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != writesym) {
 		/* Shouldn't be possible */
-		abort();
+		ASSERT(!"Failed to consume \"write\"");
 	}
 	TokenStream_consumeToken(self->token_stream);
 	

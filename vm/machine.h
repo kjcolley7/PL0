@@ -88,14 +88,8 @@ struct Machine {
 	/*! The data stack */
 	Word stack[MAX_STACK_HEIGHT];
 	
-	/*! Number of breakpoints */
-	size_t bp_count;
-	
-	/*! Allocated space for breakpoints */
-	size_t bp_cap;
-	
 	/*! Array of breakpoints set */
-	Breakpoint* bps;
+	dynamic_array(Breakpoint) bps;
 	
 	/*! Whether we should skip the next instruction if it's a breakpoint */
 	bool isResuming;
