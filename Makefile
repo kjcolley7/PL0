@@ -15,16 +15,40 @@ BUILD := build
 GEN := $(BUILD)/gen
 
 # All directories that contain source files
-SRC_DIRS := lexer compiler compiler/parser compiler/codegen vm
+SRC_DIRS := \
+	lexer \
+	compiler \
+	compiler/parser \
+	compiler/codegen \
+	compiler/codegen/pm0 \
+	vm
 
-# All C source files
-SRCS := $(wildcard *.c) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.c))
+# If we are building with support for LLVM code generation
+ifdef WITH_LLVM
 
-# Object files that need to be produced from C sources
+# Set WITH_LLVM macro for conditional compilation sections
+override CFLAGS += -DWITH_LLVM=1
+
+# Add the LLVM sources
+SRC_DIRS := $(SRC_DIRS) compiler/codegen-llvm
+
+endif #WITH_LLVM
+
+# find_srcs(ext) -> file paths
+# Macro to find all files with the given extension in SRC_DIRS
+find_srcs = $(wildcard *.$1) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.$1))
+
+# All supported source file extensions
+SRC_EXTS := c cpp
+
+# All source files
+SRCS := $(foreach ext,$(SRC_EXTS),$(call find_srcs,$(ext)))
+
+# Object files that need to be produced from sources
 OBJS := $(patsubst %,$(BUILD)/%.o,$(SRCS))
 
 # Bison parser generator input Y files
-BISON_FILES := $(wildcard compiler/parser/*.y)
+BISON_FILES := $(call find_srcs,y)
 
 # Build with support for the Bison parser generator
 ifdef WITH_BISON
@@ -54,7 +78,7 @@ endif #WITH_BISON
 DEPS := $(OBJS:.o=.d)
 
 # Header files that should be included in the produced archive
-HEADERS := $(wildcard *.h) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.h))
+HEADERS := $(call find_srcs,h)
 
 # All build directories that will be produced
 BUILD_DIRS := $(BUILD) $(addprefix $(BUILD)/,$(SRC_DIRS)) $(addprefix $(GEN)/,$(SRC_DIRS))
@@ -66,10 +90,10 @@ BUILD_DIR_FILES := $(addsuffix /.dir,$(BUILD_DIRS))
 ## Archive variables
 
 # Name of archive file
-ZIP := pl0_hw3.zip
+ZIP := pl0.zip
 
 # Dot files produced during runtime that Graphviz should render
-GRAPH_DOTS := lexer.dot ast.dot unoptimized_cfg.dot cfg.dot
+GRAPH_DOTS := lexer.dot ast.dot cfg.dot
 
 # PDF files rendered by Graphviz
 GRAPH_PDFS := $(GRAPH_DOTS:.dot=.pdf)
@@ -86,19 +110,28 @@ OUTPUTS := lexemetable.txt cleaninput.txt tokenlist.txt symboltable.txt mcode.tx
 # All input and output files for the program
 DATA := input.txt $(OUTPUTS)
 
-# All required documentation files
-DOCS := readme.txt hw3_correct.txt hw3_errors.txt
-
 # All resources that should be included in the archive
-RESOURCES := .gitignore Makefile README.md $(DOCS) $(DATA) $(TEST_CASES) $(BISON_FILES) $(SRCS) $(HEADERS)
+RESOURCES := .gitignore Makefile README.md $(DATA) $(TEST_CASES) $(BISON_FILES) $(SRCS) $(HEADERS)
 
 
 ## Build settings
 
-# Compiler and linker to use. Would prefer to use clang, but it's not installed on eustis
-CC := gcc
-LD := gcc
+# Compiler choices
+GCC := gcc
+CLANG := clang
 BISON := bison
+
+# Compilers and linker to use
+ifdef USE_GCC
+CC := $(GCC)
+LD := $(GCC)
+else #USE_GCC
+CC := $(CLANG)
+LD := $(CLANG)
+endif #USE_GCC
+
+# Parser generator to use
+YACC := $(BISON)
 
 # Graphviz renderer to use
 GV := dot
@@ -106,9 +139,9 @@ GV := dot
 # Print all commands executed when VERBOSE is defined
 ifdef VERBOSE
 _v :=
-else
+else #VERBOSE
 _v := @
-endif
+endif #VERBOSE
 
 
 ## Build rules
@@ -118,12 +151,12 @@ all: $(TARGET)
 
 # Build in debug mode (with asserts enabled)
 debug: override CFLAGS += -ggdb -DDEBUG=1 -UNDEBUG
-debug: override OFLAGS :=
+debug: override OFLAGS := -O0
 debug: $(TARGET)
 
 # Uses clang's Address Sanitizer to help detect memory errors
-debug+: override CC := clang
-debug+: override LD := clang
+debug+: override CC := $(CLANG)
+debug+: override LD := $(CLANG)
 debug+: override CFLAGS += -fsanitize=address
 debug+: override LDFLAGS += -fsanitize=address
 debug+: debug
@@ -134,22 +167,22 @@ $(TARGET): $(OBJS)
 	@echo 'Linking $@'
 	$(_v)$(LD) $(LDFLAGS) -o $@ $^
 
-# Compiling rule
-$(BUILD)/%.o: % | $(BUILD_DIR_FILES) $(PRE_CC)
+# Compiling rule for C sources
+$(BUILD)/%.c.o: %.c | $(BUILD_DIR_FILES) $(PRE_CC)
 	@echo 'Compiling $<'
-	$(_v)$(CC) $(CFLAGS) $(OFLAGS) -I$(<D) -I$(GEN) -MD -MP -MF $(BUILD)/$*.d -c -o $@ $<
+	$(_v)$(CC) $(CFLAGS) $(OFLAGS) -I$(<D) -I$(GEN) -MD -MP -MF $(BUILD)/$*.c.d -c -o $@ $<
 
-# Compiling rule for generated sources
-$(BUILD)/%.o: $(GEN)/% | $(BUILD_DIR_FILES)
+# Compiling rule for generated C sources
+$(BUILD)/%.c.o: $(GEN)/%.c | $(BUILD_DIR_FILES)
 	@echo 'Compiling $<'
-	$(_v)$(CC) $(CFLAGS) $(OFLAGS) -I$(<D) -I$(GEN) -MD -MP -MF $(BUILD)/$*.d -c -o $@ $<
+	$(_v)$(CC) $(CFLAGS) $(OFLAGS) -I$(<D) -I$(GEN) -MD -MP -MF $(BUILD)/$*.c.d -c -o $@ $<
 
 
 ifdef WITH_BISON
 # Bison parser generation rule
 $(GEN)/%.c $(GEN)/%.h: % | $(BUILD_DIR_FILES)
-	@echo 'Bison $<'
-	$(_v)$(BISON) $(YFLAGS) --output=$(GEN)/$*.c --defines=$(GEN)/$*.h $<
+	@echo 'Yacc $<'
+	$(_v)$(YACC) $(YFLAGS) --output=$(GEN)/$*.c --defines=$(GEN)/$*.h $<
 
 endif #WITH_BISON
 
@@ -180,7 +213,6 @@ graph: $(GRAPH_PDFS)
 	$(_v)$(GV) -Tpdf -o$@ $<
 
 # Crazy stupid way of telling make that running the executable makes all these outputs
-unoptimized_cfg.dot: cfg.dot
 cfg.dot: ast.dot
 ast.dot: lexer.dot
 lexer.dot: mcode.txt

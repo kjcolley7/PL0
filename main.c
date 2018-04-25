@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include "argparse.h"
 #include "tee.h"
 #include "compiler/pl0c.h"
 #include "lexer/pl0lex.h"
@@ -62,52 +63,58 @@ static FILE* check_fopen(const char* fname, const char* mode) {
 int main(int argc, char* argv[]) {
 	/* Flags used to track command line arguments */
 	unsigned opts = 0;
-	int i, err = EXIT_SUCCESS;
+	int err = EXIT_SUCCESS;
+	PARSER_TYPE parserType = PARSER_RDP;
+	CODEGEN_TYPE codegenType = CODEGEN_PM0;
 	
-	/* Loop through command line arguments */
-	for(i = 1; i < argc; i++) {
-		if(strcmp(argv[i], "--help") == 0) {
-			printf(
-				   "Usage: %s [-acdlrsmv]\n"
-				   "  -l    Duplicate token list to stdout\n"
-				   "  -s    Duplicate symbol table to stdout\n"
-				   "  -a    Duplicate disassembly to stdout\n"
-				   "  -v    Duplicate program trace to stdout\n"
-				   "  -m    Duplicate machine code to stdout\n"
-				   "  -p    Pretty print output as Markdown\n"
-				   "  -c    Compile only, do not run\n"
-				   "  -r    Run only, do not compile\n"
-				   "  -d    Run mcode.txt through the PM/0 debugger\n",
-				   argv[0]);
+	ARGPARSE(argc, argv) {
+		ARG('h', "help", "Display this help message") {
+			USAGE();
 			return EXIT_SUCCESS;
 		}
-		else if(strcmp(argv[i], "-l") == 0) {
+		ARG('l', "tee-token-list", "Duplicate token list to stdout") {
 			opts |= OPT_TEE_TOKLIST;
 		}
-		else if(strcmp(argv[i], "-s") == 0) {
+		ARG('s', "tee-symbol-table", "Duplicate symbol table to stdout") {
 			opts |= OPT_TEE_SYMTAB;
 		}
-		else if(strcmp(argv[i], "-m") == 0) {
-			opts |= OPT_TEE_MCODE;
-		}
-		else if(strcmp(argv[i], "-a") == 0) {
+		ARG('a', "tee-disassembly", "Duplicate disassembly to stdout") {
 			opts |= OPT_TEE_DISASM;
 		}
-		else if(strcmp(argv[i], "-v") == 0) {
+		ARG('v', "tee-program-trace", "Duplicate program trace to stdout") {
 			opts |= OPT_TEE_TRACE;
 		}
-		else if(strcmp(argv[i], "-c") == 0) {
+		ARG('m', "tee-machine-code", "Duplicate machine code to stdout") {
+			opts |= OPT_TEE_MCODE;
+		}
+		ARG('p', "markdown", "Pretty print output as Markdown") {
+			opts |= OPT_PRETTY;
+		}
+		ARG('c', "compile-only", "Compile only, do not run") {
 			opts |= OPT_SKIP_RUN;
 		}
-		else if(strcmp(argv[i], "-r") == 0) {
+		ARG('r', "run-only", "Run only, do not compile") {
 			opts |= OPT_SKIP_COMPILE;
 		}
-		else if(strcmp(argv[i], "-d") == 0) {
+		ARG('d', "debug", "Run program in the PM/0 debugger") {
 			opts |= OPT_DEBUGGER;
 		}
-		else {
-			printf("Unknown argument: %s\n", argv[i]);
+		ARG(0, "parser=rdp", "Use the recursive descent parser (default)") {
+			parserType = PARSER_RDP;
 		}
+#if WITH_BISON
+		ARG(0, "parser=bison", "Use the Bison-generated parser") {
+			parserType = PARSER_BISON;
+		}
+#endif /* WITH_BISON */
+		ARG(0, "codegen=pm0", "Use the PM/0 code generator (default)") {
+			codegenType = CODEGEN_PM0;
+		}
+#if WITH_LLVM
+		ARG(0, "codegen=llvm", "Use the LLVM code generator") {
+			codegenType = CODEGEN_LLVM;
+		}
+#endif /* WITH_LLVM */
 	}
 	
 	if((opts & OPT_SKIP_COMPILE) && (opts & OPT_SKIP_RUN)) {
@@ -160,7 +167,7 @@ int main(int argc, char* argv[]) {
 		compilerFiles->cfg = check_fopen(cfg_dot, "w");
 		
 		/* Compile the tokens the lexer scanned from the source code into the machine code */
-		err = run_compiler(compilerFiles);
+		err = run_compiler(compilerFiles, parserType, codegenType);
 		
 		/* Close all the compiler's files */
 		release(&compilerFiles);

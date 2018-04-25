@@ -232,7 +232,7 @@ void BasicBlock_resolve(BasicBlock* self, Block* scope) {
 			}
 			
 			default:
-				abort();
+				assert(!"Invalid symbol type");
 		}
 	}
 }

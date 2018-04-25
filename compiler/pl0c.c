@@ -28,26 +28,24 @@ Destroyer(CompilerFiles) {
 DEF(CompilerFiles);
 
 
-int run_compiler(CompilerFiles* files) {
+int run_compiler(CompilerFiles* files, PARSER_TYPE parserType, CODEGEN_TYPE codegenType) {
 	int err = EXIT_SUCCESS;
 	
 	/* Allocate and initialize PL/0 parser object */
-//	Parser* parser = Parser_initWithFile(Parser_alloc(), files->tokenlist);
+//	Parser* parser = Parser_initWithFile(Parser_alloc(), files->tokenlist, parserType);
 	FILE* input_fp = fopen("input.txt", "r");
 	if(!input_fp) {
 		perror("input.txt");
 		return EXIT_FAILURE;
 	}
 	Lexer* lexer = PL0Lexer_initWithFile(Lexer_alloc(), input_fp);
-	Parser* parser = Parser_initWithLexer(Parser_alloc(), lexer);
+	Parser* parser = Parser_initWithLexer(Parser_alloc(), lexer, parserType);
 	
 	/* Parse program */
 	AST_Block* prog = NULL;
 	bool noSyntaxErrors = Parser_parseProgram(parser, &prog);
 	if(!noSyntaxErrors) {
-#if DEBUG
 		printf("Stopping due to an earlier parsing error\n");
-#endif
 		err = EXIT_FAILURE;
 	}
 	else {
@@ -60,23 +58,13 @@ int run_compiler(CompilerFiles* files) {
 		release(&gv);
 		
 		/* Generate code using the parsed AST of the program */
-		Codegen* codegen = Codegen_initWithAST(Codegen_alloc(), prog);
+		Codegen* codegen = Codegen_initWithAST(Codegen_alloc(), prog, codegenType);
 		if(codegen == NULL) {
-#if DEBUG
 			printf("Stopping due to an earlier codegen error\n");
-#endif
 			err = EXIT_FAILURE;
 		}
 		else {
-#if DEBUG
-			/* Perform code layout before optimizations and draw the code flow graph */
-			Codegen_layoutCode(codegen);
-			Codegen_drawGraph(codegen, files->unoptimized_cfg);
-#endif
-			
 			/* Perform optimizations and layout code again, then draw optimized code flow graph */
-			Codegen_optimize(codegen);
-			Codegen_layoutCode(codegen);
 			Codegen_drawGraph(codegen, files->cfg);
 			
 			/* Produce the machine code to be executed by the vm and finish the symbol table */

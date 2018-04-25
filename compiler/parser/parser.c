@@ -15,33 +15,26 @@ Destroyer(Parser) {
 }
 DEF(Parser);
 
-Parser* Parser_initWithFile(Parser* self, FILE* fin) {
-	return Parser_initWithStream(self, TokenStream_initWithFile(TokenStream_alloc(), fin));
+Parser* Parser_initWithFile(Parser* self, FILE* fin, PARSER_TYPE type) {
+	return Parser_initWithStream(self, TokenStream_initWithFile(TokenStream_alloc(), fin), type);
 }
 
-Parser* Parser_initWithLexer(Parser* self, Lexer* lexer) {
-	return Parser_initWithStream(self, TokenStream_initWithLexer(TokenStream_alloc(), lexer));
+Parser* Parser_initWithLexer(Parser* self, Lexer* lexer, PARSER_TYPE type) {
+	return Parser_initWithStream(self, TokenStream_initWithLexer(TokenStream_alloc(), lexer), type);
 }
 
-Parser* Parser_initWithStream(Parser* self, TokenStream* stream) {
+Parser* Parser_initWithStream(Parser* self, TokenStream* stream, PARSER_TYPE type) {
 	if((self = Parser_init(self))) {
 		self->token_stream = stream;
+		self->type = type;
 	}
 	
 	return self;
 }
 
-#if WITH_BISON
-
-#include "compiler/parser/parser.y.h"
-
-bool Parser_parseProgram(Parser* self, AST_Block** program) {
-	return yyparse(self->token_stream, program) == 0;
-}
-
-#else /* WITH_BISON */
 
 /* Private parser function declarations */
+static bool Parser_parseTopBlock(Parser* self, AST_Block** program);
 static bool Parser_parseBlock(Parser* self, AST_Block** block);
 static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls);
 static bool Parser_parseVarDecls(Parser* self, AST_VarDecls** var_decls);
@@ -67,6 +60,22 @@ static bool Parser_parseNumber(Parser* self, Word* number);
 static bool Parser_parseCall(Parser* self, char** identifier, AST_ParamList** param_list);
 
 
+bool Parser_parseProgram(Parser* self, AST_Block** program) {
+	switch(self->type) {
+		case PARSER_RDP:
+			return Parser_parseTopBlock(self, program);
+			
+#if WITH_BISON
+		case PARSER_BISON:
+			return yyparse(self->token_stream, program) == 0;
+#endif /* WITH_BISON */
+			
+		default:
+			assert(!"Unknown parser type");
+	}
+}
+
+
 static void vSyntaxError(const char* fmt, va_list ap) {
 	printf("Syntax Error: ");
 	vprintf(fmt, ap);
@@ -86,7 +95,7 @@ static void syntaxError(const char* fmt, ...) {
  program ::= block "."
  @endcode
  */
-bool Parser_parseProgram(Parser* self, AST_Block** program) {
+static bool Parser_parseTopBlock(Parser* self, AST_Block** program) {
 	*program = NULL;
 	AST_Block* prog = AST_Block_new();
 	Token* tok;
@@ -1105,5 +1114,3 @@ static bool Parser_parseStmtWrite(Parser* self, AST_Stmt** write_statement) {
 	*write_statement = AST_Stmt_create(STMT_WRITE, ident);
 	return true;
 }
-
-#endif /* WITH_BISON */

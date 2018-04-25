@@ -13,6 +13,14 @@
 
 typedef struct Parser Parser;
 
+typedef enum PARSER_TYPE {
+	PARSER_RDP = 1,
+	
+#if WITH_BISON
+	PARSER_BISON,
+#endif /* WITH_BISON */
+} PARSER_TYPE;
+
 #include "object.h"
 #include "token.h"
 #include "compiler/ast_nodes.h"
@@ -24,6 +32,9 @@ struct Parser {
 	
 	/*! File stream that tokens are read in from */
 	TokenStream* token_stream;
+	
+	/*! Parser type */
+	PARSER_TYPE type;
 };
 DECL(Parser);
 
@@ -31,17 +42,17 @@ DECL(Parser);
 /*! Initializes a parser with a stream of tokens
  @param fin File stream that tokens are read in from
  */
-Parser* Parser_initWithFile(Parser* self, FILE* fin);
+Parser* Parser_initWithFile(Parser* self, FILE* fin, PARSER_TYPE type);
 
 /*! Initializes a parser with a lexer to read tokens from
  @param lexer Lexer used to stream tokens from
  */
-Parser* Parser_initWithLexer(Parser* self, Lexer* lexer);
+Parser* Parser_initWithLexer(Parser* self, Lexer* lexer, PARSER_TYPE type);
 
 /*! Initializes a parser with a token stream
  @param stream Token stream to read from
  */
-Parser* Parser_initWithStream(Parser* self, TokenStream* stream);
+Parser* Parser_initWithStream(Parser* self, TokenStream* stream, PARSER_TYPE type);
 
 /*! Parses a program from the parser's input file stream and returns the AST
  @param program Out pointer to abstract syntax tree representing the syntax of

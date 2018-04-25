@@ -119,7 +119,7 @@ void TokenStream_consumeToken(TokenStream* self) {
 	release(&self->token);
 }
 
-#ifdef WITH_BISON
+#if WITH_BISON
 int yylex(YYSTYPE* lvalp, yyscan_t scanner) {
 	/* Get next token */
 	Token* tok;

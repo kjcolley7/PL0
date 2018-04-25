@@ -7,7 +7,7 @@
 //
 
 #include "block.h"
-#include "codegen.h"
+#include "genpm0.h"
 #include "gvnode.h"
 
 
@@ -45,7 +45,7 @@ bool Block_generate(Block* self, AST_Block* ast) {
 	}
 	
 	/* Generate the code for this block */
-	return Codegen_genBlock(self, ast);
+	return GenPM0_genBlock(self, ast);
 }
 
 void Block_optimize(Block* self) {

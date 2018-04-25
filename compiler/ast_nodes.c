@@ -114,7 +114,7 @@ Destroyer(AST_Stmt) {
 			break;
 		
 		default:
-			assert(false);
+			assert(!"Invalid statement type");
 	}
 }
 DEF(AST_Stmt);
@@ -139,7 +139,7 @@ Destroyer(AST_Cond) {
 			break;
 		
 		default:
-			assert(false);
+			assert(!"Invalid condition type");
 	}
 }
 DEF(AST_Cond);
@@ -174,7 +174,7 @@ Destroyer(AST_Expr) {
 			break;
 		
 		default:
-			assert(false);
+			assert(!"Invalid expression type");
 	}
 }
 DEF(AST_Expr);
@@ -343,7 +343,7 @@ AST_Stmt* AST_Stmt_create(STMT_TYPE type, ...) {
 				break;
 			
 			default:
-				assert(false);
+				assert(!"Invalid statement type");
 		}
 		
 		return ret;
@@ -406,7 +406,7 @@ AST_Cond* AST_Cond_create(COND_TYPE type, ...) {
 				break;
 			
 			default:
-				assert(false);
+				assert(!"Invalid condition type");
 		}
 		
 		return ret;
@@ -450,7 +450,7 @@ AST_Expr* AST_Expr_create(EXPR_TYPE type, ...) {
 				break;
 			
 			default:
-				assert(false);
+				assert(!"Invalid expression type");
 		}
 		
 		return ret;

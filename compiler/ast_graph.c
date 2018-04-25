@@ -215,7 +215,7 @@ void AST_Stmt_drawGraph(AST_Stmt* self, Graphviz* gv) {
 			break;
 			
 		default:
-			assert(false);
+			assert(!"Invalid statement type");
 	}
 }
 
@@ -245,7 +245,7 @@ void AST_Cond_drawGraph(AST_Cond* self, Graphviz* gv) {
 		case COND_LT:  op_str = "&lt;";     break;
 		case COND_NE:  op_str = "&lt;&gt;"; break;
 		default:
-			assert(false);
+			assert(!"Invalid condition type");
 	}
 	
 	/* Draw relational operator node */
@@ -276,7 +276,7 @@ void AST_Cond_drawGraph(AST_Cond* self, Graphviz* gv) {
 		}
 		
 		default:
-			assert(false);
+			assert(!"Invalid condition type");
 	}
 }
 
@@ -310,7 +310,9 @@ void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv) {
 				case EXPR_SUB: op_str = "-"; break;
 				case EXPR_MUL: op_str = "*"; break;
 				case EXPR_DIV: op_str = "/"; break;
-				default: assert(false);
+				
+				default:
+					assert(!"Invalid expression type");
 			}
 			Graphviz_drawPtrNode(gv, self, "<font " FACE_TERMINAL ">%s</font>", op_str);
 			
@@ -341,7 +343,7 @@ void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv) {
 		}
 		
 		default:
-			assert(false);
+			assert(!"Invalid expression type");
 	}
 }
 

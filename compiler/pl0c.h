@@ -12,7 +12,8 @@
 typedef struct CompilerFiles CompilerFiles;
 
 #include "object.h"
-#include "lexer/pl0lex.h"
+#include "compiler/parser/parser.h"
+#include "compiler/codegen/codegen.h"
 
 struct CompilerFiles {
 	OBJECT_BASE;
@@ -31,9 +32,11 @@ DECL(CompilerFiles);
 
 /*! Run the lexer and compiler together to produce the PM/0 machine code
  @param files Open file streams used by the compiler
+ @param parserType Which parser to use
+ @param codegenType Which code generation engine to use
  @return Zero on success, nonzero on error
  */
-int run_compiler(CompilerFiles* files);
+int run_compiler(CompilerFiles* files, PARSER_TYPE parserType, CODEGEN_TYPE codegenType);
 
 
 #endif /* PL0_PL0C_H */

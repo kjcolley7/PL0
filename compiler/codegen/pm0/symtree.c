@@ -196,9 +196,9 @@ static bool SymTree_addProcs(SymTree* self, AST_ProcDecls* decls) {
 	return success;
 }
 
-static int compare_sym(const void* a, const void* b) {
-	const char* name = a;
-	const Symbol* sym = *(const Symbol**)b;
+static int compare_sym(const void* key, const void* elem) {
+	const char* name = key;
+	const Symbol* sym = *(const Symbol**)elem;
 	return strcmp(name, sym->name);
 }
 

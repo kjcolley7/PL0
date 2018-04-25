@@ -11,20 +11,32 @@ For this project, there is a Makefile which will handle all of the compilation. 
 Additionally, the Makefile understands the following variables:
 
 * `make ... VERBOSE=1`: Echo all commands before running them
-* `make ... WITH_BISON=1`: Build with the Bison generated parser instead of the custom recursive descent parser (run `make clean` before changing this)
+* `make ... WITH_BISON=1`: Build with support for the Bison generated parser.
+* `make ... WITH_LLVM=1`: Build with support for the LLVM code generator.
 
 If you simply run command `make` an executable `pl0` will be produced. 
 
 After the PL/0 toolchain is built, simply run command `./pl0` to process `input.txt` and produce all the output files.
 
-`pl0` also allows for command line switches. These switches will duplicate their corresponding output to the terminal:
+`pl0` also allows for command line switches. Run `./pl0 --help` to see a list of the available options. Example output:
 
-* `-l` The token list
-* `-s` The symbol table
-* `-m` The machine code
-* `-a` The disassembled code
-* `-v` The virtual machine execution stack trace
-
-Beyond these flags, the compiler driver accepts the `-c` option to compile the source without running it and a `-r` option to run the code in `mcode.txt` without compiling any code. Additionally, the VM has a debugger built in, so running `./pl0 -d` will compile the source and run it in the VM in a debug mode. Finally, the `-p` option tells the compiler driver to pretty print the VM stack trace as Markdown.
+```
+Usage: ./pl0 [-acdhlmprsv]
+Options:
+    -h, --help               Display this help message
+    -l, --tee-token-list     Duplicate token list to stdout
+    -s, --tee-symbol-table   Duplicate symbol table to stdout
+    -a, --tee-disassembly    Duplicate disassembly to stdout
+    -v, --tee-program-trace  Duplicate program trace to stdout
+    -m, --tee-machine-code   Duplicate machine code to stdout
+    -p, --markdown           Pretty print output as Markdown
+    -c, --compile-only       Compile only, do not run
+    -r, --run-only           Run only, do not compile
+    -d, --debug              Run program in the PM/0 debugger
+        --parser=rdp         Use the recursive descent parser (default)
+        --parser=bison       Use the Bison-generated parser
+        --codegen=pm0        Use the PM/0 code generator (default)
+        --codegen=llvm       Use the LLVM code generator
+```
 
 This compiler supports calling procedures with parameters and returning a functional value. Arrays are currently not supported.

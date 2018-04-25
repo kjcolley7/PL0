@@ -11,30 +11,47 @@
 
 typedef struct Codegen Codegen;
 
+typedef enum CODEGEN_TYPE {
+	CODEGEN_UNINITIALIZED = 0,
+	CODEGEN_PM0,
+	
+#if WITH_LLVM
+	CODEGEN_LLVM,
+#endif /* WITH_LLVM */
+} CODEGEN_TYPE;
+
 #include "object.h"
 #include "compiler/ast_nodes.h"
-#include "block.h"
 #include "graphviz.h"
+#include "pm0/genpm0.h"
+
+#if WITH_LLVM
+#include "llvm/genllvm.h"
+#endif /* WITH_LLVM */
 
 struct Codegen {
 	OBJECT_BASE;
 	
-	/*! The top-level code block of the program where execution begins */
-	Block* block;
+	/*! Codegen emitter type (PM/0 vs LLVM) */
+	CODEGEN_TYPE cgType;
+	
+	/*! The specific codegen emitter */
+	union {
+		GenPM0* pm0;    /*!< PM/0 code generator */
+		
+#if WITH_LLVM
+		GenLLVM* llvm;  /*!< LLVM code generator */
+#endif
+	} cg;
 };
 DECL(Codegen);
 
 
 /*! Initialize a codegen object from the program's AST
  @param prog AST that makes up the entire program
+ @param cgType Codegen emitter to use
  */
-Codegen* Codegen_initWithAST(Codegen* self, AST_Block* prog);
-
-/*! Sets addresses and resolves symbols */
-void Codegen_layoutCode(Codegen* self);
-
-/*! Performs basic optimizations on the code graphs */
-void Codegen_optimize(Codegen* self);
+Codegen* Codegen_initWithAST(Codegen* self, AST_Block* prog, CODEGEN_TYPE cgType);
 
 /*! Draw procedure CFGs to fp */
 void Codegen_drawGraph(Codegen* self, FILE* fp);
@@ -45,16 +62,9 @@ void Codegen_drawGraph(Codegen* self, FILE* fp);
 void Codegen_writeSymbolTable(Codegen* self, FILE* fp);
 
 /*! Emits the instructions for the program to the specified file stream
- @param fp Output file stream to emit instructions to
+ @param fp Output file stream where instructions should be emitted
  */
 void Codegen_emit(Codegen* self, FILE* fp);
-
-/*! Generate code for a block given it's AST
- @param scope Block scope for the current procedure
- @param ast AST for the block used to produce code
- @return True on success, or false on error
- */
-bool Codegen_genBlock(Block* scope, AST_Block* ast);
 
 
 #endif /* PL0_CODEGEN_H */
