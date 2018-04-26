@@ -58,7 +58,7 @@ for(int _argparse_once = 1; _argparse_once; _argparse_once = 0) \
 #define ARG_(id, short_name, long_name, description) ARG__(id, short_name, long_name, description)
 #define ARG__(id, short_name, long_name, description) \
 if(_arg == ARG_VALUE_INIT) { \
-	_argparse_add(&_argparse_info, MAKE_ARG_VALUE(id), short_name, long_name, description);\
+	_argparse_add(&_argparse_info, MAKE_ARG_VALUE(id), short_name, long_name, description); \
 } \
 else if(_arg == MAKE_ARG_VALUE(id))
 

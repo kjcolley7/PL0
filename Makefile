@@ -136,6 +136,33 @@ YACC := $(BISON)
 # Graphviz renderer to use
 GV := dot
 
+
+# Apply build configuration changes needed for building with Bison
+ifdef WITH_BISON
+
+# Set WITH_BISON macro for conditional compilation sections
+override CFLAGS += -DWITH_BISON=1
+
+endif #WITH_BISON
+
+
+# Apply build configuration changes needed for building with LLVM
+ifdef WITH_LLVM
+
+# Get the flags needed for building with the LLVM API
+LLVM_CFLAGS := $(shell llvm-config --cflags)
+LLVM_LDFLAGS := $(shell llvm-config --ldflags)
+
+# Set WITH_LLVM macro for conditional compilation sections
+override CFLAGS += -DWITH_LLVM=1 $(LLVM_CFLAGS)
+override LDFLAGS += $(LLVM_LDFLAGS)
+
+# Linking against LLVM requires a C++ linker (even though this is all C)
+override LD := $(LD++)
+
+endif #WITH_LLVM
+
+
 # Print all commands executed when VERBOSE is defined
 ifdef VERBOSE
 _v :=
