@@ -22,7 +22,7 @@
 #define DECL(type) \
 DECL_ALLOC(type); \
 DECL_INIT(type); \
-DECL_NEW(type);
+DECL_NEW(type)
 
 #define DEF_ALLOC(type) \
 type* type##_alloc(void) { \
