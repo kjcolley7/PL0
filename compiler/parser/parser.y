@@ -209,7 +209,7 @@ stmt_read
 	;
 
 stmt_write
-	: "write" IDENT
+	: "write" expr
 		{ $$ = AST_Stmt_create(STMT_WRITE, $2); }
 	;
 

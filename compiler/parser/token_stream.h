@@ -30,6 +30,9 @@ struct TokenStream {
 	
 	/*! Lexer to read tokens from */
 	Lexer* lexer;
+	
+	/*! Current line number */
+	size_t line_number;
 };
 DECL(TokenStream);
 

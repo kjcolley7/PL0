@@ -94,7 +94,7 @@ Destroyer(AST_Stmt) {
 			break;
 		
 		case STMT_WRITE:
-			destroy(&self->stmt.write.ident);
+			release(&self->stmt.write.value);
 			break;
 		
 		default:
@@ -300,7 +300,7 @@ AST_Stmt* AST_Stmt_create(STMT_TYPE type, ...) {
 				break;
 			
 			case STMT_WRITE:
-				VA_POP(ap, ret->stmt.write.ident);
+				VA_POP(ap, ret->stmt.write.value);
 				break;
 			
 			default:

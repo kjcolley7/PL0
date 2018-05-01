@@ -256,8 +256,8 @@ static bool genStmt(SymTree* scope, BasicBlock** code, AST_Stmt* statement) {
 			return genStoreVar(scope, code, statement->stmt.read.ident);
 			
 		case STMT_WRITE:
-			/* Generate code to load the value of an identifier to the top of the stack */
-			if(!genLoadIdent(scope, code, statement->stmt.write.ident)) {
+			/* Generate code to evaluate the expression and put its result on top of the stack */
+			if(!genExpr(scope, code, statement->stmt.write.value)) {
 				return false;
 			}
 			

@@ -76,15 +76,20 @@ bool Parser_parseProgram(Parser* self, AST_Block** program) {
 }
 
 
-static void vSyntaxError(const char* fmt, va_list ap) {
-	printf("Syntax Error: ");
+static void vSyntaxError(size_t line_number, const char* fmt, va_list ap) {
+	if(line_number > 0) {
+		printf("Syntax Error on line %zu: ", line_number);
+	}
+	else {
+		printf("Syntax Error: ");
+	}
 	vprintf(fmt, ap);
 	printf("\n");
 }
 
-static void syntaxError(const char* fmt, ...) {
+static void syntaxError(size_t line_number, const char* fmt, ...) {
 	VARIADIC(fmt, ap, {
-		vSyntaxError(fmt, ap);
+		vSyntaxError(line_number, fmt, ap);
 	});
 }
 
@@ -107,7 +112,8 @@ static bool Parser_parseTopBlock(Parser* self, AST_Block** program) {
 	
 	/* Consume "." token */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != periodsym) {
-		syntaxError("Expected \".\" at end of program block, not \"%s\"", tok->lexeme);
+		syntaxError(self->token_stream->line_number,
+					"Expected \".\" at end of program block, not \"%s\"", tok->lexeme);
 		release(&prog);
 		return false;
 	}
@@ -169,7 +175,8 @@ static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls) {
 		
 		/* Parse name of constant being defined */
 		if(!Parser_parseIdent(self, &newConst.ident)) {
-			syntaxError("Expected identifier in constant declaration");
+			syntaxError(self->token_stream->line_number,
+						"Expected identifier in constant declaration");
 			release(&consts);
 			return false;
 		}
@@ -177,10 +184,12 @@ static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls) {
 		/* Consume "=" */
 		if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != eqsym) {
 			if(tok != NULL) {
-				syntaxError("Expected \"=\" after name in constant declaration, not \"%s\"", tok->lexeme);
+				syntaxError(self->token_stream->line_number,
+							"Expected \"=\" after name in constant declaration, not \"%s\"", tok->lexeme);
 			}
 			else {
-				syntaxError("Unexpected EOF after name in constant declaration");
+				syntaxError(self->token_stream->line_number,
+							"Unexpected EOF after name in constant declaration");
 			}
 			release(&consts);
 			return false;
@@ -189,7 +198,8 @@ static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls) {
 		
 		/* Parse value of constant being defined and append it to the array */
 		if(!Parser_parseNumber(self, &newConst.value)) {
-			syntaxError("Expected number after \"=\" in constant declaration");
+			syntaxError(self->token_stream->line_number,
+						"Expected number after \"=\" in constant declaration");
 			release(&consts);
 			return false;
 		}
@@ -199,10 +209,12 @@ static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls) {
 	/* Consume ";" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != semicolonsym) {
 		if(tok != NULL && tok->type == identsym) {
-			syntaxError("Expected \",\" between constant declarations");
+			syntaxError(self->token_stream->line_number,
+						"Expected \",\" between constant declarations");
 		}
 		else {
-			syntaxError("Expected \";\" at end of constant declaration");
+			syntaxError(self->token_stream->line_number,
+						"Expected \";\" at end of constant declaration");
 		}
 		
 		release(&consts);
@@ -238,7 +250,8 @@ static bool Parser_parseVarDecls(Parser* self, AST_VarDecls** var_decls) {
 		/* Parse name of variable being declared and append it to the array */
 		char* var;
 		if(!Parser_parseIdent(self, &var)) {
-			syntaxError("Expected identifier in variable declaration");
+			syntaxError(self->token_stream->line_number,
+						"Expected identifier in variable declaration");
 			release(&vars);
 			return false;
 		}
@@ -248,10 +261,12 @@ static bool Parser_parseVarDecls(Parser* self, AST_VarDecls** var_decls) {
 	/* Consume ";" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != semicolonsym) {
 		if(tok != NULL && tok->type == identsym) {
-			syntaxError("Expected \",\" between variable declarations");
+			syntaxError(self->token_stream->line_number,
+						"Expected \",\" between variable declarations");
 		}
 		else {
-			syntaxError("Expected \";\" at end of variable declarations");
+			syntaxError(self->token_stream->line_number,
+						"Expected \";\" at end of variable declarations");
 		}
 		
 		release(&vars);
@@ -307,7 +322,8 @@ static bool Parser_parseProc(Parser* self, AST_Proc** procedure) {
 	
 	/* Parse the procedure's name */
 	if(!Parser_parseIdent(self, &proc->ident)) {
-		syntaxError("Expected identifier after \"procedure\"");
+		syntaxError(self->token_stream->line_number,
+					"Expected identifier after \"procedure\"");
 		release(&proc);
 		return false;
 	}
@@ -320,7 +336,8 @@ static bool Parser_parseProc(Parser* self, AST_Proc** procedure) {
 	
 	/* Consume ";" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != semicolonsym) {
-		syntaxError("Expected \";\" after name of procedure in procedure declaration");
+		syntaxError(self->token_stream->line_number,
+					"Expected \";\" after name of procedure in procedure declaration");
 		release(&proc);
 		return false;
 	}
@@ -334,7 +351,8 @@ static bool Parser_parseProc(Parser* self, AST_Proc** procedure) {
 	
 	/* Consume ";" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != semicolonsym) {
-		syntaxError("Expected \";\" at end of procedure declaration");
+		syntaxError(self->token_stream->line_number,
+					"Expected \";\" at end of procedure declaration");
 		release(&proc);
 		return false;
 	}
@@ -356,7 +374,8 @@ static bool Parser_parseParamDecls(Parser* self, AST_ParamDecls** param_decls) {
 	
 	/* Consume "(" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != lparentsym) {
-		syntaxError("Expected parameter declaration list after procedure declaration");
+		syntaxError(self->token_stream->line_number,
+					"Expected parameter declaration list after procedure declaration");
 		release(&params);
 		return false;
 	}
@@ -367,7 +386,8 @@ static bool Parser_parseParamDecls(Parser* self, AST_ParamDecls** param_decls) {
 		/* Parse name of first parameter and append it to the array */
 		char* param;
 		if(!Parser_parseIdent(self, &param)) {
-			syntaxError("Expected identifier for first parameter in parameter declarations list");
+			syntaxError(self->token_stream->line_number,
+						"Expected identifier for first parameter in parameter declarations list");
 			release(&params);
 			return false;
 		}
@@ -380,7 +400,7 @@ static bool Parser_parseParamDecls(Parser* self, AST_ParamDecls** param_decls) {
 			
 			/* Parse name of next parameter and append it to the array */
 			if(!Parser_parseIdent(self, &param)) {
-				syntaxError(
+				syntaxError(self->token_stream->line_number,
 					"Expected identifier for parameter %zu in parameter declarations list",
 					params->params.count);
 				release(&params);
@@ -392,7 +412,8 @@ static bool Parser_parseParamDecls(Parser* self, AST_ParamDecls** param_decls) {
 	
 	/* Consume ")" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != rparentsym) {
-		syntaxError("Expected \")\" at end of parameter declarations");
+		syntaxError(self->token_stream->line_number,
+					"Expected \")\" at end of parameter declarations");
 		release(&params);
 		return false;
 	}
@@ -448,7 +469,8 @@ static bool Parser_parseCond(Parser* self, AST_Cond** condition) {
 	
 	/* Peek the next token */
 	if(!TokenStream_peekToken(self->token_stream, &tok)) {
-		syntaxError("Expected a condition but encountered end of file");
+		syntaxError(self->token_stream->line_number,
+					"Expected a condition but encountered end of file");
 		release(&cond);
 		return false;
 	}
@@ -473,7 +495,8 @@ static bool Parser_parseCond(Parser* self, AST_Cond** condition) {
 		
 		/* Peek next token */
 		if(!TokenStream_peekToken(self->token_stream, &tok)) {
-			syntaxError("Expected a relational operator but encountered end of file");
+			syntaxError(self->token_stream->line_number,
+						"Expected a relational operator but encountered end of file");
 			return false;
 		}
 		
@@ -487,7 +510,8 @@ static bool Parser_parseCond(Parser* self, AST_Cond** condition) {
 			case geqsym: cond->type = COND_GE; break;
 				
 			default:
-				syntaxError("Expected a relational operator but encountered \"%s\"", tok->lexeme);
+				syntaxError(self->token_stream->line_number,
+							"Expected a relational operator but encountered \"%s\"", tok->lexeme);
 				release(&cond);
 				return false;
 		}
@@ -623,8 +647,8 @@ static bool Parser_parseFactor(Parser* self, AST_Expr** factor) {
 	AST_Expr* fact;
 	
 	if(!TokenStream_peekToken(self->token_stream, &tok)) {
-		syntaxError("Expected identifier, number, or parenthesized subexpression, but got EOF");
-		release(&fact);
+		syntaxError(self->token_stream->line_number,
+					"Expected identifier, number, or parenthesized subexpression, but got EOF");
 		return false;
 	}
 	
@@ -660,7 +684,8 @@ static bool Parser_parseFactor(Parser* self, AST_Expr** factor) {
 			
 			/* Consume ")" */
 			if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != rparentsym) {
-				syntaxError("Expected \")\" after subexpression");
+				syntaxError(self->token_stream->line_number,
+							"Expected \")\" after subexpression");
 				release(&fact);
 				return false;
 			}
@@ -680,8 +705,8 @@ static bool Parser_parseFactor(Parser* self, AST_Expr** factor) {
 		}
 		
 		default:
-			syntaxError("Unexpected token \"%s\" while parsing factor", tok->lexeme);
-			release(&fact);
+			syntaxError(self->token_stream->line_number,
+						"Unexpected token \"%s\" while parsing factor", tok->lexeme);
 			return false;
 	}
 	
@@ -746,14 +771,16 @@ static bool Parser_parseCall(Parser* self, char** identifier, AST_ParamList** pa
 	
 	/* Consume "call" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != callsym) {
-		syntaxError("Expected \"call\"");
+		syntaxError(self->token_stream->line_number,
+					"Expected \"call\"");
 		return false;
 	}
 	TokenStream_consumeToken(self->token_stream);
 	
 	/* Parse the identifier */
 	if(!Parser_parseIdent(self, identifier)) {
-		syntaxError("Expected identifier after \"call\"");
+		syntaxError(self->token_stream->line_number,
+					"Expected identifier after \"call\"");
 		return false;
 	}
 	
@@ -777,7 +804,8 @@ static bool Parser_parseParamList(Parser* self, AST_ParamList** param_list) {
 	
 	/* Consume "(" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != lparentsym) {
-		syntaxError("Expected parameter list after procedure call");
+		syntaxError(self->token_stream->line_number,
+					"Expected parameter list after procedure call");
 		release(&paramList);
 		return false;
 	}
@@ -788,7 +816,8 @@ static bool Parser_parseParamList(Parser* self, AST_ParamList** param_list) {
 		/* Parse expression for first parameter */
 		AST_Expr* param;
 		if(!Parser_parseExpr(self, &param)) {
-			syntaxError("Expected expression for first parameter in parameter list");
+			syntaxError(self->token_stream->line_number,
+						"Expected expression for first parameter in parameter list");
 			release(&paramList);
 			return false;
 		}
@@ -801,7 +830,7 @@ static bool Parser_parseParamList(Parser* self, AST_ParamList** param_list) {
 			
 			/* Parse expression for next parameter */
 			if(!Parser_parseExpr(self, &param)) {
-				syntaxError(
+				syntaxError(self->token_stream->line_number,
 					"Expected expression for parameter %zu in parameter list",
 					paramList->params.count);
 				release(&paramList);
@@ -813,7 +842,8 @@ static bool Parser_parseParamList(Parser* self, AST_ParamList** param_list) {
 	
 	/* Consume ")" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != rparentsym) {
-		syntaxError("Expected \")\" at end of parameter list");
+		syntaxError(self->token_stream->line_number,
+					"Expected \")\" at end of parameter list");
 		release(&paramList);
 		return false;
 	}
@@ -842,7 +872,8 @@ static bool Parser_parseStmtAssign(Parser* self, AST_Stmt** assign_statement) {
 	
 	/* Read and consume the := token */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != becomessym) {
-		syntaxError("Expected \":=\" after identifier in assignment statement");
+		syntaxError(self->token_stream->line_number,
+					"Expected \":=\" after identifier in assignment statement");
 		destroy(&ident);
 		return false;
 	}
@@ -879,7 +910,8 @@ static bool Parser_parseStmtCall(Parser* self, AST_Stmt** call_statement) {
 	
 	/* Read the identifier, which should be the name of the subprocedure */
 	if(!Parser_parseIdent(self, &ident)) {
-		syntaxError("Expected identifier after \"call\"");
+		syntaxError(self->token_stream->line_number,
+					"Expected identifier after \"call\"");
 		return false;
 	}
 	
@@ -931,7 +963,8 @@ static bool Parser_parseStmtBegin(Parser* self, AST_Stmt** begin_statement) {
 	
 	/* Consume "end" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != endsym) {
-		syntaxError("Expected \"end\" at end of block");
+		syntaxError(self->token_stream->line_number,
+					"Expected \"end\" at end of block");
 		release(&begin);
 		return false;
 	}
@@ -962,13 +995,15 @@ static bool Parser_parseStmtIf(Parser* self, AST_Stmt** if_statement) {
 	
 	/* Parse condition */
 	if(!Parser_parseCond(self, &cond)) {
-		syntaxError("Expected condition after \"if\"");
+		syntaxError(self->token_stream->line_number,
+					"Expected condition after \"if\"");
 		return false;
 	}
 	
 	/* Consume "then" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != thensym) {
-		syntaxError("Expected \"then\" after condition of \"if\" statement");
+		syntaxError(self->token_stream->line_number,
+					"Expected \"then\" after condition of \"if\" statement");
 		release(&cond);
 		return false;
 	}
@@ -976,7 +1011,8 @@ static bool Parser_parseStmtIf(Parser* self, AST_Stmt** if_statement) {
 	
 	/* Parse body of the "then" branch of the if statement */
 	if(!Parser_parseStmt(self, &then_stmt)) {
-		syntaxError("Expected statement after \"then\" in \"if\" statement");
+		syntaxError(self->token_stream->line_number,
+					"Expected statement after \"then\" in \"if\" statement");
 		release(&cond);
 		return false;
 	}
@@ -988,7 +1024,8 @@ static bool Parser_parseStmtIf(Parser* self, AST_Stmt** if_statement) {
 		
 		/* Parse body of the "else" branch of the if statement */
 		if(!Parser_parseStmt(self, &else_stmt)) {
-			syntaxError("Expected statement after \"else\" in \"if\" statement");
+			syntaxError(self->token_stream->line_number,
+						"Expected statement after \"else\" in \"if\" statement");
 			release(&then_stmt);
 			release(&cond);
 			return false;
@@ -1020,13 +1057,15 @@ static bool Parser_parseStmtWhile(Parser* self, AST_Stmt** while_statement) {
 	
 	/* Parse condition */
 	if(!Parser_parseCond(self, &cond)) {
-		syntaxError("Expected condition after \"while\"");
+		syntaxError(self->token_stream->line_number,
+					"Expected condition after \"while\"");
 		return false;
 	}
 	
 	/* Consume "do" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != dosym) {
-		syntaxError("Expected \"do\" after condition of \"while\" statement");
+		syntaxError(self->token_stream->line_number,
+					"Expected \"do\" after condition of \"while\" statement");
 		release(&cond);
 		return false;
 	}
@@ -1034,7 +1073,8 @@ static bool Parser_parseStmtWhile(Parser* self, AST_Stmt** while_statement) {
 	
 	/* Parse body of while statement */
 	if(!Parser_parseStmt(self, &body)) {
-		syntaxError("Expected statement after \"do\" in \"while\" statement");
+		syntaxError(self->token_stream->line_number,
+					"Expected statement after \"do\" in \"while\" statement");
 		release(&cond);
 		return false;
 	}
@@ -1063,7 +1103,8 @@ static bool Parser_parseStmtRead(Parser* self, AST_Stmt** read_statement) {
 	
 	/* Parse name of variable to read into */
 	if(!Parser_parseIdent(self, &ident)) {
-		syntaxError("Expected identifier after \"read\"");
+		syntaxError(self->token_stream->line_number,
+					"Expected identifier after \"read\"");
 		return false;
 	}
 	
@@ -1074,13 +1115,13 @@ static bool Parser_parseStmtRead(Parser* self, AST_Stmt** read_statement) {
 
 /*! Grammar:
  @code
- stmt-write ::= "write" ident
+ stmt-write ::= "write" expr
  @endcode
  */
 static bool Parser_parseStmtWrite(Parser* self, AST_Stmt** write_statement) {
 	*write_statement = NULL;
 	Token* tok;
-	char* ident;
+	AST_Expr* value;
 	
 	/* Consume "write" */
 	if(!TokenStream_peekToken(self->token_stream, &tok) || tok->type != writesym) {
@@ -1089,13 +1130,14 @@ static bool Parser_parseStmtWrite(Parser* self, AST_Stmt** write_statement) {
 	}
 	TokenStream_consumeToken(self->token_stream);
 	
-	/* Parse name of variable to write */
-	if(!Parser_parseIdent(self, &ident)) {
-		syntaxError("Expected identifier after \"write\"");
+	/* Parse expression to write */
+	if(!Parser_parseExpr(self, &value)) {
+		syntaxError(self->token_stream->line_number,
+					"Expected expression after \"write\"");
 		return false;
 	}
 	
 	/* Create write statement */
-	*write_statement = AST_Stmt_create(STMT_WRITE, ident);
+	*write_statement = AST_Stmt_create(STMT_WRITE, value);
 	return true;
 }

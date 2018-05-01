@@ -156,7 +156,7 @@ struct AST_Stmt {
 			char* ident;
 		} read;                         /*!< STMT_READ */
 		struct {
-			char* ident;
+			AST_Expr* value;
 		} write;                        /*!< STMT_WRITE */
 	} stmt;                             /*!< Required */
 };

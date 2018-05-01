@@ -472,6 +472,9 @@ static void Stmt_Read_drawGraph(AST_Stmt* self, Graphviz* gv) {
 
 static void Stmt_Write_drawGraph(AST_Stmt* self, Graphviz* gv) {
 	Graphviz_drawPtrNode(gv, self,
-		"<font " FACE_TERMINAL ">write <font " COLOR_VAR ">%s</font></font>",
-		self->stmt.write.ident);
+		"<font " FACE_TERMINAL ">write</font>");
+	
+	/* Draw expression to be written */
+	AST_Expr_drawGraph(self->stmt.write.value, gv);
+	Graphviz_drawPtrEdge(gv, self, self->stmt.write.value);
 }

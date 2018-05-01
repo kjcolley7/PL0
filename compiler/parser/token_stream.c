@@ -111,6 +111,7 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 		self->token = Token_initWithType(Token_alloc(), type, lexeme, 0);
 	}
 	
+	self->line_number = self->token->line_number;
 	*tok = self->token;
 	return true;
 }
