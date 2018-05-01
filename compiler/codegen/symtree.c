@@ -9,6 +9,11 @@
 #include "symtree.h"
 
 
+/*! Add all parameters from a block's containing procedure
+ @param params Node that holds all of the parameter declarations for a block
+ */
+static bool SymTree_addParams(SymTree* self, AST_ParamDecls* params);
+
 /*! Add all const names from a given block's declarations
  @param decls Node that holds all of the constant declarations in a block
  */
@@ -24,12 +29,6 @@ static bool SymTree_addVars(SymTree* self, AST_VarDecls* decls);
  */
 static bool SymTree_addProcs(SymTree* self, AST_ProcDecls* decls);
 
-/*! Add a new symbol into the current SymTree node. Holds a strong reference
- @param sym The Symbol that is being added into the tree
- @return True on success, or false if the symbol already exists at this level
- */
-static bool SymTree_addSymbol(SymTree* self, Symbol* sym);
-
 /*! Compares a `const char* name` with the name of a `const Symbol** psym` */
 static int compare_sym(const void* a, const void* b);
 
@@ -40,7 +39,7 @@ Destroyer(SymTree) {
 }
 DEF(SymTree);
 
-SymTree* SymTree_initWithAST(SymTree* self, SymTree* parent, AST_Block* block, uint16_t level) {
+SymTree* SymTree_initWithAST(SymTree* self, SymTree* parent, AST_ParamDecls* params, AST_Block* block, uint16_t level) {
 	if((self = SymTree_init(self))) {
 		/* Set the hierarchy first */
 		SymTree_addChild(parent, self);
@@ -70,7 +69,8 @@ SymTree* SymTree_initWithAST(SymTree* self, SymTree* parent, AST_Block* block, u
 		}
 		
 		/* Add consts, vars, and procs into the symbol tree and sort them */
-		if(!SymTree_addConsts(self, block->consts) ||
+		if(!SymTree_addParams(self, params)        ||
+		   !SymTree_addConsts(self, block->consts) ||
 		   !SymTree_addVars(self, block->vars)     ||
 		   !SymTree_addProcs(self, block->procs)) {
 			release(&self);
@@ -79,6 +79,31 @@ SymTree* SymTree_initWithAST(SymTree* self, SymTree* parent, AST_Block* block, u
 	}
 	
 	return self;
+}
+
+static bool SymTree_addParams(SymTree* self, AST_ParamDecls* params) {
+	bool success = true;
+	
+	/* Check if we were given parameters */
+	if(params != NULL && params->params.count > 0) {
+		/* Add variables for all the parameters */
+		foreach(&params->params, pparam) {
+			/* Create new parameter symbol for each param */
+			Symbol* symParam = Symbol_new();
+			symParam->type = SYM_VAR;
+			symParam->name = strdup_ff(*pparam);
+			symParam->level = self->level;
+			symParam->value.frame_offset = self->frame_size++;
+			
+			/* Try to add the parameter into the Tree node */
+			success = SymTree_addSymbol(self, symParam);
+			
+			/* The SymTree now holds a reference to symParam, so release our local reference */
+			release(&symParam);
+		}
+	}
+	
+	return success;
 }
 
 static bool SymTree_addConsts(SymTree* self, AST_ConstDecls* decls) {
@@ -149,34 +174,15 @@ static bool SymTree_addProcs(SymTree* self, AST_ProcDecls* decls) {
 		symProc->level = self->level;
 		
 		/* Create the child symtrees */
-		SymTree* child = SymTree_initWithAST(SymTree_alloc(), self, (*pproc)->body, self->level + 1);
+		SymTree* child = SymTree_initWithAST(SymTree_alloc(), self, (*pproc)->param_decls, (*pproc)->body, self->level + 1);
+		if(!child) {
+			release(&symProc);
+			return false;
+		}
 		
 		/* Set the parameter count */
 		size_t param_count = (*pproc)->param_decls ? (*pproc)->param_decls->params.count : 0;
 		symProc->value.procedure.param_count = param_count;
-		
-		if(param_count != 0) {
-			/* Add variables for all the parameters */
-			foreach(&(*pproc)->param_decls->params, pparam) {
-				/* Create new parameter symbol for each param */
-				Symbol* symParam = Symbol_new();
-				symParam->type = SYM_VAR;
-				symParam->name = strdup_ff(*pparam);
-				symParam->level = child->level;
-				symParam->value.frame_offset = child->frame_size++;
-				
-				/* Try to add the parameter into the Tree node */
-				success = SymTree_addSymbol(child, symParam);
-				
-				/* The child SymTree now holds a reference to symParam, so release ours */
-				release(&symParam);
-				
-				if(!success) {
-					release(&symProc);
-					return false;
-				}
-			}
-		}
 		
 		/* Create the block */
 		symProc->value.procedure.body = Block_initWithScope(Block_alloc(), child);
@@ -195,7 +201,7 @@ static int compare_sym(const void* key, const void* elem) {
 	return strcmp(name, sym->name);
 }
 
-static bool SymTree_addSymbol(SymTree* self, Symbol* sym) {
+bool SymTree_addSymbol(SymTree* self, Symbol* sym) {
 	/* Have to manually bsearch to find the place to insert the symbol */
 	size_t lo = 0, hi = self->syms.count;
 	while(lo < hi) {

@@ -46,7 +46,7 @@ static void semanticError(const char* fmt, ...) {
 GenPM0* GenPM0_initWithAST(GenPM0* self, AST_Block* prog) {
 	if((self = GenPM0_init(self))) {
 		/* Build the symbol tree */
-		SymTree* scope = SymTree_initWithAST(SymTree_alloc(), NULL, prog, 0);
+		SymTree* scope = SymTree_initWithAST(SymTree_alloc(), NULL, NULL, prog, 0);
 		if(scope == NULL) {
 			/* Codegen error occurred, so destroy self and return NULL */
 			release(&self);

@@ -44,10 +44,17 @@ DECL(SymTree);
 
 /*! Initialize the symbol tree given an AST of the block
  @param parent Parent node in the symbol tree to this one
+ @param params AST node for the parameters to this block's containing procedure
  @param block AST node for the block used to recursively create the symbol tree
  @param level Current lexicographic level of the SymTree
  */
-SymTree* SymTree_initWithAST(SymTree* self, SymTree* parent, AST_Block* block, uint16_t level);
+SymTree* SymTree_initWithAST(SymTree* self, SymTree* parent, AST_ParamDecls* params, AST_Block* block, uint16_t level);
+
+/*! Add a new symbol into the current SymTree node. Holds a strong reference
+ @param sym The Symbol that is being added into the tree
+ @return True on success, or false if the symbol already exists at this level
+ */
+bool SymTree_addSymbol(SymTree* self, Symbol* sym);
 
 /*! Add a new child into the current SymTree node
  @param child The child that is being added into the tree
