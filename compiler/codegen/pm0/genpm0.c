@@ -322,10 +322,16 @@ static bool genExpr(SymTree* scope, BasicBlock** code, AST_Expr* expression) {
 			return genNumber(scope, code, expression->values.num);
 			
 		case EXPR_NEG:
-			if(!genExpr(scope, code, expression->values.operand)) {
-				return false;
+			if(expression->values.operand->type == EXPR_NUM) {
+				/* Peephole optimization: -n -> "LIT -n" instead of "LIT n; NEG" */
+				BasicBlock_addInsn(*code, MAKE_LIT(-expression->values.operand->values.num));
 			}
-			BasicBlock_addInsn(*code, MAKE_NEG());
+			else {
+				if(!genExpr(scope, code, expression->values.operand)) {
+					return false;
+				}
+				BasicBlock_addInsn(*code, MAKE_NEG());
+			}
 			return true;
 			
 		case EXPR_ADD: expr_insn = MAKE_ADD(); break;
