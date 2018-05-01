@@ -2,7 +2,15 @@
 TARGET := pl0
 
 # Compiler flags to use
-override CFLAGS += -D_GNU_SOURCE=1 -Wall -Wextra -Wno-unused-function -Werror -I.
+override CFLAGS += \
+	-std=gnu99 \
+	-D_GNU_SOURCE=1 \
+	-Wall \
+	-Wextra \
+	-Werror \
+	-Wno-unused-function \
+	-I.
+
 override OFLAGS += -O2 -flto
 override LDFLAGS +=
 override STRIP_FLAGS += -Wl,-S -Wl,-x
@@ -28,7 +36,7 @@ SRC_DIRS := \
 ifdef WITH_LLVM
 
 # Add the LLVM sources
-SRC_DIRS := $(SRC_DIRS) compiler/codegen-llvm
+SRC_DIRS := $(SRC_DIRS) compiler/codegen/llvm
 
 endif #WITH_LLVM
 
@@ -156,9 +164,19 @@ ifdef WITH_LLVM
 LLVM_CFLAGS := $(shell llvm-config --cflags)
 LLVM_LDFLAGS := $(shell llvm-config --ldflags)
 
+LLVM_CFLAGS_REMOVE := \
+	-pedantic \
+	-Wvariadic-macros \
+	-Wstring-conversion \
+	-Wgnu-statement-expression \
+	-Wgnu-conditional-omitted-operand \
+	-Wcovered-switch-default
+
+LLVM_CFLAGS := $(filter-out $(LLVM_CFLAGS_REMOVE),$(LLVM_CFLAGS))
+
 # Set WITH_LLVM macro for conditional compilation sections
-override CFLAGS += -DWITH_LLVM=1 $(LLVM_CFLAGS)
-override LDFLAGS += $(LLVM_LDFLAGS)
+override CFLAGS := -DWITH_LLVM=1 $(LLVM_CFLAGS) $(CFLAGS)
+override LDFLAGS := $(LDFLAGS) $(LLVM_LDFLAGS)
 
 # Linking against LLVM requires a C++ linker (even though this is all C)
 override LD := $(LD++)
