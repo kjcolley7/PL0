@@ -43,8 +43,9 @@ bool Block_generate(Block* self, AST_Block* ast) {
 	}
 	
 	/* Generate the code for this block into a new empty basic block */
-	self->code = BasicBlock_new();
-	return GenPM0_genBlock(self->symtree, &self->code, ast);
+	BasicBlock* code = BasicBlock_new();
+	self->code = code;
+	return GenPM0_genBlock(self->symtree, &code, ast);
 }
 
 void Block_optimize(Block* self) {
