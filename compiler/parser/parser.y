@@ -77,6 +77,7 @@
 %token         WRITE      31 "write"      /*!< The "write" keyword */
 %token         READ       32 "read"       /*!< The "read" keyword */
 %token         ELSE       33 "else"       /*!< The "else" keyword */
+%token         MOD        34 "%"          /*!< The modulus operator, "%" */
 
 /* Fix "dangling else" ambiguity (shift/reduce conflict) */
 %precedence    THEN
@@ -259,6 +260,7 @@ negated_expr
 term_op
 	: "*" { $$ = EXPR_MUL; }
 	| "/" { $$ = EXPR_DIV; }
+	| "%" { $$ = EXPR_MOD; }
 	;
 
 term

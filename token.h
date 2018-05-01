@@ -51,7 +51,8 @@ enum token_type {
 	procsym,       /*!< The "proc" keyword */
 	writesym,      /*!< The "write" keyword */
 	readsym,       /*!< The "read" keyword */
-	elsesym        /*!< The "else" keyword */
+	elsesym,       /*!< The "else" keyword */
+	percentsym     /*!< The modulus operator, "%" */
 };
 
 struct Token {

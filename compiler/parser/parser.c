@@ -564,7 +564,7 @@ static bool Parser_parseRawExpr(Parser* self, AST_Expr** expression, bool negate
 
 /*! Grammar:
  @code
- term ::= factor [ ("*"|"/") term ]
+ term ::= factor [ ("*"|"/"|"%") term ]
  @endcode
  */
 static bool Parser_parseTerm(Parser* self, AST_Expr** term, bool negate) {
@@ -582,11 +582,18 @@ static bool Parser_parseTerm(Parser* self, AST_Expr** term, bool negate) {
 		trm = AST_Expr_create(EXPR_NEG, trm);
 	}
 	
-	/* Try to consume a multiplication or division operator token */
-	if(TokenStream_peekToken(self->token_stream, &tok)
-	   && (tok->type == multsym || tok->type == slashsym)) {
+	/* Try to consume a multiplication, division, or modulus operator token */
+	if(TokenStream_peekToken(self->token_stream, &tok)) {
 		/* Determine expression type */
-		EXPR_TYPE type = tok->type == multsym ? EXPR_MUL : EXPR_DIV;
+		EXPR_TYPE type;
+		switch(tok->type) {
+			case multsym:    type = EXPR_MUL; break;
+			case slashsym:   type = EXPR_DIV; break;
+			case percentsym: type = EXPR_MOD; break;
+			
+			default: goto done;
+		}
+		
 		TokenStream_consumeToken(self->token_stream);
 		
 		/* Parse right side */
@@ -600,6 +607,7 @@ static bool Parser_parseTerm(Parser* self, AST_Expr** term, bool negate) {
 		trm = AST_Expr_create(type, trm, right);
 	}
 	
+done:
 	*term = trm;
 	return true;
 }

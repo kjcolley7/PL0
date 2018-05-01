@@ -332,6 +332,7 @@ static bool genExpr(SymTree* scope, BasicBlock** code, AST_Expr* expression) {
 		case EXPR_SUB: expr_insn = MAKE_SUB(); break;
 		case EXPR_MUL: expr_insn = MAKE_MUL(); break;
 		case EXPR_DIV: expr_insn = MAKE_DIV(); break;
+		case EXPR_MOD: expr_insn = MAKE_MOD(); break;
 			
 		case EXPR_CALL:
 			if(!genCall(scope, code, expression->values.call.ident, expression->values.call.param_list)) {

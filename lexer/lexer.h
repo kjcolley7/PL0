@@ -34,10 +34,7 @@ struct Lexer {
 	State* fsm;
 	
 	/*! Character buffer for the lexeme of the current token */
-	char* lexeme;
-	
-	/*! Total byte count allocated for the lexeme */
-	size_t lexeme_cap;
+	dynamic_array(char) lexeme;
 	
 	/*! Current line number (aids in debugging) */
 	int line_number;

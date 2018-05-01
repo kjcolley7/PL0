@@ -148,6 +148,7 @@ Destroyer(AST_Expr) {
 		case EXPR_SUB:
 		case EXPR_MUL:
 		case EXPR_DIV:
+		case EXPR_MOD:
 			release(&self->values.binop.left);
 			release(&self->values.binop.right);
 			break;
@@ -395,6 +396,7 @@ AST_Expr* AST_Expr_create(EXPR_TYPE type, ...) {
 			case EXPR_SUB:
 			case EXPR_MUL:
 			case EXPR_DIV:
+			case EXPR_MOD:
 				VA_POP(ap, ret->values.binop.left);
 				VA_POP(ap, ret->values.binop.right);
 				break;

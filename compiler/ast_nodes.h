@@ -70,6 +70,7 @@ enum EXPR_TYPE {
 	EXPR_SUB,
 	EXPR_MUL,
 	EXPR_DIV,
+	EXPR_MOD,
 	EXPR_CALL
 };
 

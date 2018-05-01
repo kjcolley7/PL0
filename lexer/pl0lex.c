@@ -124,7 +124,7 @@ static Token* accept_comment(Lexer* lexer) {
 	} while(c != '/');
 	
 	if(c == EOF) {
-		fprintf(stdout, "Error [%d]: End of file occurred within a comment.\n", lexer->line_number);
+		fprintf(stdout, "Syntax Error on line %d: End of file occurred within a comment.\n", lexer->line_number);
 		return NULL;
 	}
 	
@@ -134,30 +134,30 @@ static Token* accept_comment(Lexer* lexer) {
 
 static Token* accept_identifier(Lexer* lexer) {
 	/* Make sure the identifier doesn't have more than 1 characters */
-	if(strlen(lexer->lexeme) > 11) {
-		fprintf(stdout, "Error [%d]: Identifier cannot be longer than 11 characters: \"%s\"\n",
-				lexer->line_number, lexer->lexeme);
+	if(lexer->lexeme.count > 11) {
+		fprintf(stdout, "Syntax Error on line %d: Identifier cannot be longer than 11 characters: \"%s\"\n",
+		        lexer->line_number, lexer->lexeme.elems);
 		return NULL;
 	}
 	
 	/* Return an identifier token normally */
-	return Token_initWithType(Token_alloc(), identsym, lexer->lexeme, lexer->line_number);
+	return Token_initWithType(Token_alloc(), identsym, lexer->lexeme.elems, lexer->line_number);
 }
 
 static Token* accept_number(Lexer* lexer) {
 	/* Make sure the number doesn't have more than 5 digits */
-	if(strlen(lexer->lexeme) > 5) {
-		fprintf(stdout, "Error [%d]: Number literal cannot be longer than 5 digits: \"%s\"\n",
-				lexer->line_number, lexer->lexeme);
+	if(lexer->lexeme.count > 5) {
+		fprintf(stdout, "Syntax Error on line %d: Number literal cannot be longer than 5 digits: \"%s\"\n",
+		        lexer->line_number, lexer->lexeme.elems);
 		return NULL;
 	}
 	
 	/* Return a number token normally */
-	return Token_initWithType(Token_alloc(), numbersym, lexer->lexeme, lexer->line_number);
+	return Token_initWithType(Token_alloc(), numbersym, lexer->lexeme.elems, lexer->line_number);
 }
 
 static Token* accept_invalid_varname(Lexer* lexer) {
-	fprintf(stdout, "Error [%d]: Invalid identifier: \"%s\"\n", lexer->line_number, lexer->lexeme);
+	fprintf(stdout, "Syntax Error on line %d: Invalid identifier: \"%s\"\n", lexer->line_number, lexer->lexeme.elems);
 	return NULL;
 }
 
@@ -217,6 +217,7 @@ static void add_pl0_tokens(Lexer* lexer) {
 	Lexer_addToken(lexer, "-", minussym);
 	Lexer_addToken(lexer, "*", multsym);
 	Lexer_addToken(lexer, "/", slashsym);
+	Lexer_addToken(lexer, "%", percentsym);
 	Lexer_addToken(lexer, "=", eqsym);
 	Lexer_addToken(lexer, "<", lessym);
 	Lexer_addToken(lexer, "<>", neqsym);

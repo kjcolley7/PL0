@@ -304,7 +304,8 @@ void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv) {
 		case EXPR_ADD:
 		case EXPR_SUB:
 		case EXPR_MUL:
-		case EXPR_DIV: {
+		case EXPR_DIV:
+		case EXPR_MOD: {
 			/* Draw binary operator */
 			const char* op_str;
 			switch(self->type) {
@@ -312,6 +313,7 @@ void AST_Expr_drawGraph(AST_Expr* self, Graphviz* gv) {
 				case EXPR_SUB: op_str = "-"; break;
 				case EXPR_MUL: op_str = "*"; break;
 				case EXPR_DIV: op_str = "/"; break;
+				case EXPR_MOD: op_str = "%"; break;
 				
 				default:
 					ASSERT(!"Invalid expression type");
