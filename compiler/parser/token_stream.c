@@ -41,7 +41,10 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 		return true;
 	}
 	
+	bool success = true;
+	const char* errorLexeme = "ERROR";
 	*tok = NULL;
+	
 	if(self->lexer != NULL) {
 		/* Need to get the next token from the lexer */
 		self->token = Lexer_nextToken(self->lexer);
@@ -54,7 +57,9 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 		/* Read in the token type and its lexeme */
 		int val;
 		if(fscanf(self->fin, "%d", &val) != 1) {
-			return false;
+			success = false;
+			errorLexeme = "BAD_INPUT";
+			goto out;
 		}
 		type = val;
 		
@@ -64,7 +69,9 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 			case numbersym:
 				/* Read the lexeme (max 11 chars) */
 				if(fscanf(self->fin, "%11s", lexeme) != 1) {
-					return false;
+					success = false;
+					errorLexeme = "BAD_LITERAL";
+					goto out;
 				}
 				break;
 				
@@ -101,7 +108,9 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 			
 			default:
 				printf("Invalid token type: %d\n", type);
-				return false;
+				success = false;
+				errorLexeme = "BAD_TYPE";
+				goto out;
 		}
 		
 		/* Make sure the lexeme is NULL-terminated */
@@ -111,9 +120,15 @@ bool TokenStream_peekToken(TokenStream* self, Token** tok) {
 		self->token = Token_initWithType(Token_alloc(), type, lexeme, 0);
 	}
 	
+out:
 	self->line_number = self->token->line_number;
+	if(!self->token) {
+		success = false;
+		self->token = Token_initWithType(Token_alloc(), nulsym, errorLexeme, self->line_number);
+	}
+	
 	*tok = self->token;
-	return true;
+	return success;
 }
 
 void TokenStream_consumeToken(TokenStream* self) {
