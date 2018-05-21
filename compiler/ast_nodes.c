@@ -384,9 +384,12 @@ AST_Expr* AST_Expr_create(EXPR_TYPE type, ...) {
 				VA_POP(ap, ret->values.ident);
 				break;
 			
-			case EXPR_NUM:
-				VA_POP(ap, ret->values.num);
+			case EXPR_NUM: {
+				int tmp;
+				VA_POP(ap, tmp);
+				ret->values.num = tmp;
 				break;
+			}
 			
 			case EXPR_NEG:
 				VA_POP(ap, ret->values.operand);
