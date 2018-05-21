@@ -21,7 +21,7 @@ After the PL/0 toolchain is built, simply run command `./pl0` to process `input.
 `pl0` also allows for command line switches. Run `./pl0 --help` to see a list of the available options. Example output:
 
 ```
-Usage: ./pl0 [-acdhlmprsv]
+Usage: ./pl0 [-acdhlmnprsv]
 Options:
     -h, --help               Display this help message
     -l, --tee-token-list     Duplicate token list to stdout
@@ -33,6 +33,7 @@ Options:
     -c, --compile-only       Compile only, do not run
     -r, --run-only           Run only, do not compile
     -d, --debug              Run program in the PM/0 debugger
+    -n, --no-stacktrace      Don't write stacktrace while running (MUCH FASTER!)
         --parser=rdp         Use the recursive descent parser (default)
         --parser=bison       Use the Bison-generated parser
         --codegen=pm0        Use the PM/0 code generator (default)
