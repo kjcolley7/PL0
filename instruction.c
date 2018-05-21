@@ -32,7 +32,7 @@ static const char* op_str[16] = {
 
 
 void Insn_emit(Insn insn, FILE* fp) {
-	fprintf(fp, "%hu %hu %d\n", insn.op, insn.lvl, insn.imm);
+	fprintf(fp, "%hu %hu %"PRIdWORD"\n", insn.op, insn.lvl, insn.imm);
 }
 
 /* Read an entire PM/0 program from the text file into the code array given */
@@ -41,7 +41,7 @@ int read_program(Insn* code, Word maxcount, FILE* fp) {
 	Insn* end = &code[maxcount];
 	
 	/* Keep reading lines of code until the end of the file */
-	while(fscanf(fp, "%hu%hu%d", &cur->op, &cur->lvl, &cur->imm) == 3) {
+	while(fscanf(fp, "%hu%hu%"SCNdWORD, &cur->op, &cur->lvl, &cur->imm) == 3) {
 		if(++cur == end) {
 			fprintf(stderr, "Completely filled code array\n");
 			break;
@@ -69,7 +69,7 @@ bool dis_program(char* buf, size_t linesiz, Word count, Insn* code, const char* 
 		}
 		
 		/*                         |      Insn|        OP|          L|         M| */
-		snprintf(buf, linesiz, "%7$s%3$*1$u%7$s%4$*2$s%7$s%5$*2$hu%7$s%6$*2$d%7$s",
+		snprintf(buf, linesiz, "%7$s%3$*1$u%7$s%4$*2$s%7$s%5$*2$hu%7$s%6$*2$"PRIdWORD"%7$s",
 		         DIS_FIRST_COL_WIDTH, DIS_COL_WIDTH,
 				 i, opstr, code[i].lvl, code[i].imm,
 				 sep);
@@ -182,7 +182,7 @@ char* Insn_prettyDis(Insn insn) {
 				asprintf_ff(&ret, "%s %hu UND", mnemonic, insn.lvl);
 			}
 			else {
-				asprintf_ff(&ret, "%s %hu %d", mnemonic, insn.lvl, insn.imm);
+				asprintf_ff(&ret, "%s %hu %"PRIdWORD, mnemonic, insn.lvl, insn.imm);
 			}
 			break;
 		
@@ -193,13 +193,13 @@ char* Insn_prettyDis(Insn insn) {
 				asprintf_ff(&ret, "%s UND", mnemonic);
 			}
 			else {
-				asprintf_ff(&ret, "%s %d", mnemonic, insn.imm);
+				asprintf_ff(&ret, "%s %"PRIdWORD, mnemonic, insn.imm);
 			}
 			break;
 		
 		/* Instructions with only two operands visible */
 		default:
-			asprintf_ff(&ret, "%s %d", mnemonic, insn.imm);
+			asprintf_ff(&ret, "%s %"PRIdWORD, mnemonic, insn.imm);
 			break;
 	}
 	return ret;

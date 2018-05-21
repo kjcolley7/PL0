@@ -71,13 +71,13 @@ void GenLLVM_emit(GenLLVM* self, FILE* fp) {
 
 static LLVMTypeRef getWordTy(void) {
 	/* Ensure Word is a 16-bit integer */
-	ASSERT(sizeof(Word) == sizeof(int16_t));
+	ASSERT(sizeof(Word) == sizeof(int32_t));
 	
 	/* Ensure Word is signed */
 	ASSERT((Word)(-1) < 0);
 	
-	/* Word is an i16 */
-	return LLVMInt16Type();
+	/* Word is an i32 */
+	return LLVMInt32Type();
 }
 
 static bool genProg(AST_Block* prog, LLVMModuleRef* pModule) {

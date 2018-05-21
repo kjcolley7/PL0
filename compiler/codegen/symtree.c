@@ -7,6 +7,7 @@
 //
 
 #include "symtree.h"
+#include <inttypes.h>
 
 
 /*! Add all parameters from a block's containing procedure
@@ -287,8 +288,8 @@ void SymTree_drawProcs(SymTree* self, Graphviz* gv) {
 			
 			/* Draw name of procedure and its param count */
 			Graphviz_draw(proc,
-				"label=<<font color=\"" CAL_COLOR "\">%s</font> (%zu parameters)>;",
-				(*psym)->name, (*psym)->value.procedure.param_count);
+				"label=<<font color=\"" CAL_COLOR "\">%s</font> (level=%"PRIu16", %zu parameters)>;",
+				(*psym)->name, (*psym)->level, (*psym)->value.procedure.param_count);
 			
 			/* Draw the code graph */
 			Block_drawGraph((*psym)->value.procedure.body, proc);

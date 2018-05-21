@@ -278,14 +278,14 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		/* Parse addr */
 		addr = (Word)strtol(str, &end, 0);
 		if(*end != '\0') {
-			printf("Invalid address given to breakpoint add\n");
+			printf("Invalid address given to `breakpoint add`\n");
 			DebugEngine_helpBreakpoint(self);
 			return;
 		}
 		
 		/* Add breakpoint */
 		bpid = Machine_addBreakpoint(self->cpu, addr);
-		printf("Created breakpoint #%d at address %d\n", bpid + 1, addr);
+		printf("Created breakpoint #%d at address %"PRIdWORD"\n", bpid + 1, addr);
 	}
 	else if(strcasecmp(subcmd, "list") == 0) {
 		CHECK_ARG_COUNT(2);
@@ -293,7 +293,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		/* List breakpoints */
 		printf("Breakpoints:\n");
 		enumerate(&self->cpu->bps, i, bp) {
-			printf("Breakpoint #%d at address %d is %sabled\n",
+			printf("Breakpoint #%d at address %"PRIdWORD" is %sabled\n",
 				(int)i + 1, bp->addr, bp->enabled ? "en" : "dis");
 		}
 	}
@@ -303,7 +303,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		/* Parse id */
 		bpid = (int)strtol(cmd->args.elems[2], &end, 0);
 		if(*end != '\0') {
-			printf("Invalid breakpoint id given to breakpoint disable\n");
+			printf("Invalid breakpoint ID given to `breakpoint disable`\n");
 			DebugEngine_helpBreakpoint(self);
 			return;
 		}
@@ -319,7 +319,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		/* Parse id */
 		bpid = (int)strtol(cmd->args.elems[2], &end, 0);
 		if(*end != '\0') {
-			printf("Invalid breakpoint id given to breakpoint enable\n");
+			printf("Invalid breakpoint ID given to `breakpoint enable`\n");
 			DebugEngine_helpBreakpoint(self);
 			return;
 		}
@@ -335,7 +335,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		/* Parse id */
 		bpid = (int)strtol(cmd->args.elems[2], &end, 0);
 		if(*end != '\0') {
-			printf("Invalid breakpoint id given to breakpoint toggle\n");
+			printf("Invalid breakpoint ID given to `breakpoint toggle`\n");
 			DebugEngine_helpBreakpoint(self);
 			return;
 		}
@@ -375,7 +375,12 @@ static void DebugEngine_doContinue(DebugEngine* self, Command* cmd) {
 	
 	/* Continue execution */
 	if(Machine_continue(self->cpu) == STATUS_PAUSED) {
-		printf("Hit breakpoint at address %d\n", self->cpu->state.pc);
+		if(self->cpu->codemem[self->cpu->state.pc].imm == OP_BREAK) {
+			printf("Hit breakpoint at address %"PRIdWORD"\n", self->cpu->state.pc);
+		}
+		else {
+			printf("Program paused at address %"PRIdWORD"\n", self->cpu->state.pc);
+		}
 	}
 	Machine_printState(self->cpu, stdout);
 }

@@ -10,12 +10,13 @@
 #define PL0_CONFIG_H
 
 #include <stdint.h>
+#include <inttypes.h>
 
 /* Size of the data stack */
-#define MAX_STACK_HEIGHT    2000
+#define MAX_STACK_HEIGHT    ((Word)2000)
 
 /* Size of the code section */
-#define MAX_CODE_LENGTH     500
+#define MAX_CODE_LENGTH     ((Word)500)
 
 /* Maximum number of stack frames (not possible to store more than this) */
 #define MAX_LEXI_LEVELS     (MAX_STACK_HEIGHT / 4)
@@ -36,6 +37,12 @@
 typedef int32_t Word;
 #define WORD_MIN INT32_MIN
 #define WORD_MAX INT32_MAX
+
+/* Helper macros for printing/scanning a Word */
+#define PRIdWORD PRId32
+#define PRIxWORD PRIx32
+#define SCNdWORD SCNd32
+#define SCNxWORD SCNx32
 
 /* Represents an address that is currently undefined */
 #define ADDR_UND ((Word)-1)

@@ -87,13 +87,18 @@ void Graphviz_drawPtrEdge(Graphviz* self, void* from, void* to);
 /* Helpful functions */
 
 /*! Convert a character into an HTML-escaped string */
-static inline char* html_char(char c) {
+static inline const char* html_char(char c) {
+	static char literal[2] = {};
+	
 	switch(c) {
-		case '<': return strdup_ff("&lt;");
-		case '>': return strdup_ff("&gt;");
-		case '&': return strdup_ff("&amp;");
-		case '"': return strdup_ff("&quot;");
-		default: return strdup_ff(((const char[2]){c, '\0'}));
+		case '<': return "&lt;";
+		case '>': return "&gt;";
+		case '&': return "&amp;";
+		case '"': return "&quot;";
+		
+		default:
+			literal[0] = c;
+			return literal;
 	}
 }
 

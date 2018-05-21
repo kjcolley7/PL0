@@ -277,13 +277,13 @@ static void Machine_execute(Machine* self, jmp_buf jmp) {
 		case OP_SIO:
 			switch(IR.imm) {
 				case 1: /* WRITE */
-					fprintf(self->fout, "%d\n", TOP);
+					fprintf(self->fout, "%"PRIdWORD"\n", TOP);
 					POP();
 					break;
 					
 				case 2: /* READ */ {
 					Word n;
-					if(fscanf(self->fin, "%d", &n) != 1) {
+					if(fscanf(self->fin, "%"PRIdWORD, &n) != 1) {
 						/* Not sure how to handle EOF */
 						n = -1;
 					}
@@ -299,7 +299,7 @@ static void Machine_execute(Machine* self, jmp_buf jmp) {
 					break;
 				
 				default:
-					runtimeError("Unknown SIO instruction: SIO %d", IR.imm);
+					runtimeError("Unknown SIO instruction: SIO %"PRIdWORD, IR.imm);
 					longjmp(jmp, STATUS_ERROR);
 			}
 			break;
@@ -399,7 +399,7 @@ static void Machine_execALU(Machine* self, jmp_buf jmp) {
 			break;
 			
 		default:
-			runtimeError("Unknown OPR instruction: OPR %d", IR.imm);
+			runtimeError("Unknown OPR instruction: OPR %"PRIdWORD, IR.imm);
 			longjmp(jmp, STATUS_ERROR);
 	}
 }
@@ -491,14 +491,14 @@ void Machine_start(Machine* self) {
 			/*                      |      Insn|        OP|         L|         M| */
 			fprintf(self->flog, "%7$s%3$*1$s%7$s%3$*2$s%7$s%3$*2$s%7$s%3$*2$s%7$s"
 					/*       pc|        bp|        sp| stack */
-					"%4$*2$d%7$s%5$*2$d%7$s%6$*2$d%7$s\n",
+					"%4$*2$"PRIdWORD"%7$s%5$*2$"PRIdWORD"%7$s%6$*2$"PRIdWORD"%7$s\n",
 					DIS_FIRST_COL_WIDTH, DIS_COL_WIDTH,
 					"", PC, BP, SP,
 					self->sep);
 		}
 		else {
 			/*                                   pc|        bp|        sp| stack */
-			fprintf(self->flog, "%3$-*2$s%4$*1$d%7$s%5$*1$d%7$s%6$*1$d%7$s\n",
+			fprintf(self->flog, "%3$-*2$s%4$*1$"PRIdWORD"%7$s%5$*1$"PRIdWORD"%7$s%6$*1$"PRIdWORD"%7$s\n",
 					DIS_COL_WIDTH, DIS_FIRST_COL_WIDTH + 3 * DIS_COL_WIDTH,
 					"Initial values", PC, BP, SP,
 					self->sep);
@@ -541,7 +541,7 @@ CPUStatus Machine_continue(Machine* self) {
 		if(self->flog != NULL) {
 			/* Print out next row in stack trace table */
 			/*             ...|        pc|        bp|        sp| stack */
-			fprintf(self->flog, "%1$s%3$*2$d%6$s%4$*2$d%6$s%5$*2$d%6$s  ",
+			fprintf(self->flog, "%1$s%3$*2$"PRIdWORD"%6$s%4$*2$"PRIdWORD"%6$s%5$*2$"PRIdWORD"%6$s  ",
 				dis, DIS_COL_WIDTH, PC, BP, SP,
 				self->sep);
 			
@@ -685,7 +685,7 @@ void Machine_printStack(Machine* self, FILE* fp) {
 			fprintf(fp, "%s|", stackpos == 1 ? "" : " ");
 		}
 		
-		fprintf(fp, &" %d"[stackpos == 1 && curframe == 0], self->stack[stackpos]);
+		fprintf(fp, &" %"PRIdWORD[stackpos == 1 && curframe == 0], self->stack[stackpos]);
 	}
 	
 	fprintf(fp, "\n");
@@ -701,26 +701,36 @@ void Machine_printState(Machine* self, FILE* fp) {
 		case STATUS_ERROR:   status = "ERROR"; break;
 		default: ASSERT(!"Unknown machine status");
 	}
-	printf("Status: %s\n", status);
+	fprintf(fp, "Status: %s\n", status);
+	
+	/* Show registers */
+	fprintf(fp, "BP: %"PRIdWORD"\n", BP);
+	fprintf(fp, "SP: %"PRIdWORD"\n", SP);
+	fprintf(fp, "PC: %"PRIdWORD"\n", PC);
+	
+	/* Show instructions around PC */
+	fprintf(fp, "\n");
+	Word addr;
+	for(addr = PC - 2; addr <= PC + 2; addr++) {
+		if(addr >= 0 && addr < self->insn_count) {
+			fprintf(fp, "%c%s\n", " >"[addr == PC], self->codelines[addr + 2]);
+		}
+	}
+	fprintf(fp, "\n");
 	
 	/* Show contents of stack */
 	fprintf(fp, "Stack contents:\n");
 	if(SP <= 0) {
-		printf("Empty\n");
+		fprintf(fp, "Empty\n");
 	}
 	else {
 		Machine_printStack(self, fp);
 	}
-	printf("\n");
-	
-	/* Show registers */
-	fprintf(fp, "BP: %d\n", BP);
-	fprintf(fp, "SP: %d\n", SP);
-	fprintf(fp, "PC: %d\n", PC);
+	fprintf(fp, "\n");
 	
 	/* Show contents of IR */
 	fprintf(fp, "\nInstruction:\n");
 	fprintf(fp, "OP: %s\n", Insn_getMnemonic(IR));
 	fprintf(fp, "L:  %hu\n", IR.lvl);
-	fprintf(fp, "M:  %d\n", IR.imm);
+	fprintf(fp, "M:  %"PRIdWORD"\n", IR.imm);
 }
