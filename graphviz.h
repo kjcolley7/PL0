@@ -103,14 +103,12 @@ static inline char* html_str(const char* s) {
 		return NULL;
 	}
 	
-	char* str = NULL;
+	dynamic_string str = {};
 	while(*s != '\0') {
-		char* ent = html_char(*s++);
-		astrcat(&str, ent);
-		destroy(&ent);
+		string_append(&str, html_char(*s++));
 	}
 	
-	return str;
+	return string_cstr(&str);
 }
 
 

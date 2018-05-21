@@ -27,12 +27,12 @@ Destroyer(AST_ConstDecls) {
 	foreach(&self->consts, pconst) {
 		destroy(&pconst->ident);
 	}
-	clear_array(&self->consts);
+	array_clear(&self->consts);
 }
 DEF(AST_ConstDecls);
 
 Destroyer(AST_ParamDecls) {
-	destroy_array(&self->params);
+	array_destroy(&self->params);
 }
 DEF(AST_ParamDecls);
 
@@ -40,7 +40,7 @@ Destroyer(AST_VarDecls) {
 	foreach(&self->vars, pvar) {
 		destroy(pvar);
 	}
-	clear_array(&self->vars);
+	array_clear(&self->vars);
 }
 DEF(AST_VarDecls);
 
@@ -48,7 +48,7 @@ Destroyer(AST_ProcDecls) {
 	foreach(&self->procs, pproc) {
 		release(pproc);
 	}
-	clear_array(&self->procs);
+	array_clear(&self->procs);
 }
 DEF(AST_ProcDecls);
 
@@ -74,7 +74,7 @@ Destroyer(AST_Stmt) {
 			break;
 		
 		case STMT_BEGIN: {
-			release_array(&self->stmt.begin.stmts);
+			array_release(&self->stmt.begin.stmts);
 			break;
 		}
 		
@@ -165,7 +165,7 @@ Destroyer(AST_Expr) {
 DEF(AST_Expr);
 
 Destroyer(AST_ParamList) {
-	release_array(&self->params);
+	array_release(&self->params);
 }
 DEF(AST_ParamList);
 
@@ -202,7 +202,7 @@ AST_ConstDecls* AST_ConstDecls_append(AST_ConstDecls* self, char* ident, Word va
 		.ident = ident,
 		.value = value
 	};
-	append(&self->consts, newConst);
+	array_append(&self->consts, newConst);
 	return self;
 }
 
@@ -217,7 +217,7 @@ AST_VarDecls* AST_VarDecls_append(AST_VarDecls* self, char* ident) {
 	}
 	
 	/* Append variable */
-	append(&self->vars, ident);
+	array_append(&self->vars, ident);
 	return self;
 }
 
@@ -240,7 +240,7 @@ AST_ProcDecls* AST_ProcDecls_append(AST_ProcDecls* self, char* ident, AST_ParamD
 	proc->body = body;
 	
 	/* Append procedure declaration object */
-	append(&self->procs, proc);
+	array_append(&self->procs, proc);
 	return self;
 }
 
@@ -255,7 +255,7 @@ AST_ParamDecls* AST_ParamDecls_append(AST_ParamDecls* self, char* ident) {
 	}
 	
 	/* Append parameter */
-	append(&self->params, ident);
+	array_append(&self->params, ident);
 	return self;
 }
 
@@ -332,7 +332,7 @@ AST_Stmt* AST_Stmt_append(AST_Stmt* self, AST_Stmt* stmt) {
 	ASSERT(self->type == STMT_BEGIN);
 	
 	/* Append statement to array */
-	append(&self->stmt.begin.stmts, stmt);
+	array_append(&self->stmt.begin.stmts, stmt);
 	return self;
 }
 
@@ -442,6 +442,6 @@ AST_ParamList* AST_ParamList_append(AST_ParamList* self, AST_Expr* expr) {
 	}
 	
 	/* Append expression to array */
-	append(&self->params, expr);
+	array_append(&self->params, expr);
 	return self;
 }

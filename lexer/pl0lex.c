@@ -134,30 +134,30 @@ static Token* accept_comment(Lexer* lexer) {
 
 static Token* accept_identifier(Lexer* lexer) {
 	/* Make sure the identifier doesn't have more than 1 characters */
-	if(lexer->lexeme.count > 11) {
+	if(string_length(&lexer->lexeme) > 11) {
 		fprintf(stdout, "Syntax Error on line %d: Identifier cannot be longer than 11 characters: \"%s\"\n",
-		        lexer->line_number, lexer->lexeme.elems);
+		        lexer->line_number, string_cstr(&lexer->lexeme));
 		return NULL;
 	}
 	
 	/* Return an identifier token normally */
-	return Token_initWithType(Token_alloc(), identsym, lexer->lexeme.elems, lexer->line_number);
+	return Token_initWithType(Token_alloc(), identsym, string_cstr(&lexer->lexeme), lexer->line_number);
 }
 
 static Token* accept_number(Lexer* lexer) {
 	/* Make sure the number doesn't have more than 5 digits */
-	if(lexer->lexeme.count > 5) {
+	if(string_length(&lexer->lexeme) > 5) {
 		fprintf(stdout, "Syntax Error on line %d: Number literal cannot be longer than 5 digits: \"%s\"\n",
-		        lexer->line_number, lexer->lexeme.elems);
+		        lexer->line_number, string_cstr(&lexer->lexeme));
 		return NULL;
 	}
 	
 	/* Return a number token normally */
-	return Token_initWithType(Token_alloc(), numbersym, lexer->lexeme.elems, lexer->line_number);
+	return Token_initWithType(Token_alloc(), numbersym, string_cstr(&lexer->lexeme), lexer->line_number);
 }
 
 static Token* accept_invalid_varname(Lexer* lexer) {
-	fprintf(stdout, "Syntax Error on line %d: Invalid identifier: \"%s\"\n", lexer->line_number, lexer->lexeme.elems);
+	fprintf(stdout, "Syntax Error on line %d: Invalid identifier: \"%s\"\n", lexer->line_number, string_cstr(&lexer->lexeme));
 	return NULL;
 }
 
@@ -174,9 +174,8 @@ static bool match_number(char c) {
 }
 
 static void add_identifier_transitions(State* cur, Transition* trans) {
-	size_t i;
-	for(i = 0; i < cur->transitions.count; i++) {
-		Transition* next = cur->transitions.elems[i];
+	foreach(&cur->transitions, pnext) {
+		Transition* next = *pnext;
 		
 		/* This code will break if we ever add a reserved word with numbers in it */
 		if(next->matcher == NULL && isalpha(next->exact)) {

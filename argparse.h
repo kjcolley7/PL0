@@ -104,7 +104,7 @@ static inline void _argparse_add(
 		.long_name = long_name,
 		.description = description
 	};
-	append(&argparse_info->args, arg);
+	array_append(&argparse_info->args, arg);
 	
 	/* Update max long_name_width while respecting the upper bound */
 	if(long_name != NULL) {

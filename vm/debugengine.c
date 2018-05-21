@@ -55,7 +55,7 @@ typedef struct Command {
 DECL(Command);
 
 Destroyer(Command) {
-	destroy_array(&self->args);
+	array_destroy(&self->args);
 }
 DEF(Command);
 
@@ -68,11 +68,7 @@ static Command* Command_initWithLine(Command* self, const char* line) {
 		/* Add all arguments */
 		char* cmdstr;
 		while((cmdstr = Command_getNextArgument(&line))) {
-			/* Expand arguments array if necessary */
-			expand_if_full(&self->args);
-			
-			/* Append each argument */
-			self->args.elems[self->args.count++] = cmdstr;
+			array_append(&self->args, cmdstr);
 		}
 		
 		/* Need at least the command name */
@@ -296,9 +292,7 @@ static void DebugEngine_doBreakpoint(DebugEngine* self, Command* cmd) {
 		
 		/* List breakpoints */
 		printf("Breakpoints:\n");
-		size_t i;
-		for(i = 0; i < self->cpu->bps.count; i++) {
-			Breakpoint* bp = &self->cpu->bps.elems[i];
+		enumerate(&self->cpu->bps, i, bp) {
 			printf("Breakpoint #%d at address %d is %sabled\n",
 				(int)i + 1, bp->addr, bp->enabled ? "en" : "dis");
 		}

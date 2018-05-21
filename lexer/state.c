@@ -13,7 +13,7 @@
 
 Destroyer(State) {
 	destroy(&self->label);
-	release_array(&self->transitions);
+	array_release(&self->transitions);
 }
 DEF(State);
 
@@ -53,7 +53,7 @@ void State_addTransition(State* self, Transition* trans) {
 	}
 	
 	/* Add the new transition */
-	append(&self->transitions, retain(trans));
+	array_append(&self->transitions, retain(trans));
 }
 
 State* State_transition(State* self, char c) {

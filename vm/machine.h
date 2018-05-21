@@ -150,29 +150,29 @@ CPUStatus Machine_getStatus(Machine* self);
  @param addr Code address to insert a breakpoint
  @return Breakpoint ID, or -1 on error
  */
-int Machine_addBreakpoint(Machine* self, Word addr);
+Word Machine_addBreakpoint(Machine* self, Word addr);
 
 /*! Check if a breakpoint with the specified ID exists
  @param bpid ID of breakpoint to check for
  @return True if the breakpoint exists, false otherwise
  */
-bool Machine_breakpointExists(Machine* self, int bpid);
+bool Machine_breakpointExists(Machine* self, Word bpid);
 
 /*! Disable a breakpoint referenced by its ID
  @param bpid ID of breakpoint to disable
  */
-void Machine_disableBreakpoint(Machine* self, int bpid);
+void Machine_disableBreakpoint(Machine* self, Word bpid);
 
 /*! Enable a previously disabled breakpoint by its ID
  @param bpid ID of breakpoint to disable
  */
-void Machine_enableBreakpoint(Machine* self, int bpid);
+void Machine_enableBreakpoint(Machine* self, Word bpid);
 
 /*! Toggle whether a breakpoint is disabled
  @param bpid ID of breakpoint to toggle
  @return New state of the breakpoint
  */
-bool Machine_toggleBreakpoint(Machine* self, int bpid);
+bool Machine_toggleBreakpoint(Machine* self, Word bpid);
 
 /*! Removes all breakpoints */
 void Machine_clearBreakpoints(Machine* self);

@@ -104,7 +104,7 @@ static void interrupt_handler(int sig) {
 
 
 Destroyer(Machine) {
-	destroy(&self->bps.elems);
+	array_clear(&self->bps);
 }
 DEF(Machine);
 
@@ -576,7 +576,7 @@ CPUStatus Machine_getStatus(Machine* self) {
 	return self->status;
 }
 
-int Machine_addBreakpoint(Machine* self, Word addr) {
+Word Machine_addBreakpoint(Machine* self, Word addr) {
 	/* Make sure breakpoint address is within the code segment */
 	if(addr < 0 || addr >= self->insn_count) {
 		return -1;
@@ -587,24 +587,24 @@ int Machine_addBreakpoint(Machine* self, Word addr) {
 		return self->codemem[addr].imm;
 	}
 	
-	/* Expand breakpoint array if necessary */
-	expand_if_full(&self->bps);
+	/* Get breakpoint ID */
+	Word breakpointID = (Word)self->bps.count;
 	
 	/* Save breakpoint information */
-	self->bps.elems[self->bps.count] = (Breakpoint){addr, self->codemem[addr], true};
+	array_append(&self->bps, (Breakpoint){addr, self->codemem[addr], true});
 	
 	/* Replace real instruction with breakpoint instruction */
-	self->codemem[addr] = MAKE_BREAK((int)self->bps.count);
+	self->codemem[addr] = MAKE_BREAK(breakpointID);
 	
 	/* Return breakpoint ID */
-	return (int)self->bps.count++;
+	return breakpointID;
 }
 
-bool Machine_breakpointExists(Machine* self, int bpid) {
-	return bpid >= 0 && bpid < (int)self->bps.count;
+bool Machine_breakpointExists(Machine* self, Word bpid) {
+	return bpid >= 0 && bpid < (Word)self->bps.count;
 }
 
-void Machine_disableBreakpoint(Machine* self, int bpid) {
+void Machine_disableBreakpoint(Machine* self, Word bpid) {
 	/* Make sure breakpoint ID is valid */
 	if(!Machine_breakpointExists(self, bpid)) {
 		return;
@@ -622,10 +622,10 @@ void Machine_disableBreakpoint(Machine* self, int bpid) {
 	self->codemem[bp->addr] = bp->orig;
 	
 	/* Mark breakpoint as disabled */
-	self->bps.elems[bpid].enabled = false;
+	bp->enabled = false;
 }
 
-void Machine_enableBreakpoint(Machine* self, int bpid) {
+void Machine_enableBreakpoint(Machine* self, Word bpid) {
 	/* Make sure breakpoint ID is valid */
 	if(!Machine_breakpointExists(self, bpid)) {
 		return;
@@ -643,12 +643,12 @@ void Machine_enableBreakpoint(Machine* self, int bpid) {
 	self->codemem[bp->addr] = MAKE_BREAK(bpid);
 	
 	/* Mark breakpoint as enabled */
-	self->bps.elems[bpid].enabled = true;
+	bp->enabled = true;
 }
 
-bool Machine_toggleBreakpoint(Machine* self, int bpid) {
+bool Machine_toggleBreakpoint(Machine* self, Word bpid) {
 	/* Make sure breakpoint ID is valid */
-	if(Machine_breakpointExists(self, bpid)) {
+	if(!Machine_breakpointExists(self, bpid)) {
 		return false;
 	}
 	
@@ -667,15 +667,12 @@ bool Machine_toggleBreakpoint(Machine* self, int bpid) {
 
 void Machine_clearBreakpoints(Machine* self) {
 	/* Disable all breakpoints */
-	size_t i;
-	for(i = 0; i < self->bps.count; i++) {
-		Machine_disableBreakpoint(self, (unsigned)i);
+	enumerate(&self->bps, i, _) {
+		Machine_disableBreakpoint(self, (Word)i);
 	}
 	
 	/* Destroy the breakpoint array */
-	self->bps.count = 0;
-	self->bps.cap = 0;
-	destroy(&self->bps.elems);
+	array_clear(&self->bps);
 }
 
 void Machine_printStack(Machine* self, FILE* fp) {

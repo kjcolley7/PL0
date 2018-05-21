@@ -49,9 +49,8 @@ static State* getState(State* cur, const char* prefix) {
 	State* next = State_initWithLabel(State_alloc(), " ");
 	
 	/* Transition from the current state to the next one using the current character */
-	char* label = strdup_ff((const char[2]){prefix[0], '\0'});
+	char label[2] = {prefix[0], '\0'};
 	Transition* trans = Transition_initWithExact(Transition_alloc(), label, next, true, prefix[0]);
-	destroy(&label);
 	
 	/* Release our reference since trans now has a reference to next, but keep a weak reference */
 	State* weak_next = next;
@@ -96,7 +95,7 @@ Token* Lexer_nextToken(Lexer* self) {
 	State* next = self->fsm;
 	
 	/* Reset the lexeme buffer */
-	clear_array(&self->lexeme);
+	string_clear(&self->lexeme);
 	
 	/* Keep reading characters until a complete token is scanned */
 	int c = ' ';
@@ -108,7 +107,7 @@ Token* Lexer_nextToken(Lexer* self) {
 		c = getc(self->stream);
 		
 		/* Store the current character in the next position in the lexeme buffer */
-		append(&self->lexeme, c);
+		string_appendChar(&self->lexeme, c);
 		
 		/* Try to transition to the next state */
 		next = State_transition(cur, c);
@@ -117,7 +116,7 @@ Token* Lexer_nextToken(Lexer* self) {
 		if(next == NULL && cur == self->fsm) {
 			if(isspace(c)) {
 				/* Discard lexeme */
-				clear_array(&self->lexeme);
+				string_clear(&self->lexeme);
 				
 				/* Keep track of line numbers */
 				if(c == '\n') {
@@ -135,7 +134,7 @@ Token* Lexer_nextToken(Lexer* self) {
 			}
 			else if(c == EOF) {
 				/* Discard lexeme */
-				clear_array(&self->lexeme);
+				string_clear(&self->lexeme);
 				
 				/* End of file */
 				self->at_eof = true;
@@ -153,24 +152,20 @@ Token* Lexer_nextToken(Lexer* self) {
 	/* Scanning of the current lexeme finished, so the current state should be an acceptor */
 	if(!cur->acceptor) {
 		if(isspace(c)) {
-			/* Replace final space with a NULL terminator */
-			self->lexeme.elems[self->lexeme.count-1] = '\0';
-		}
-		else {
-			/* Null-terminate the lexeme */
-			append(&self->lexeme, '\0');
+			/* Remove final space */
+			string_removeIndex(&self->lexeme, string_length(&self->lexeme) - 1);
 		}
 		
 		/* The current state isn't an acceptor state, so this is an error */
-		fprintf(stdout, "Syntax Error on line %d: Unknown sequence: \"%s\"\n", self->line_number, self->lexeme.elems);
+		fprintf(stdout, "Syntax Error on line %d: Unknown sequence: \"%s\"\n", self->line_number, string_cstr(&self->lexeme));
 		return NULL;
 	}
 	
 	/* Ended lexeme on an acceptor state, so a token was matched */
 	ungetc(c, self->stream);
 	
-	/* Replace final space with a NULL terminator */
-	self->lexeme.elems[self->lexeme.count-1] = '\0';
+	/* Remove final space */
+	string_removeIndex(&self->lexeme, string_length(&self->lexeme) - 1);
 	
 	/* If the state has an acceptor function, call it */
 	if(cur->acceptfn != NULL) {
@@ -178,7 +173,7 @@ Token* Lexer_nextToken(Lexer* self) {
 	}
 	
 	/* State doesn't have an acceptor function, so it must be a simple acceptor */
-	return Token_initWithType(Token_alloc(), cur->simple_type, self->lexeme.elems, self->line_number);
+	return Token_initWithType(Token_alloc(), cur->simple_type, string_cstr(&self->lexeme), self->line_number);
 }
 
 void Lexer_drawGraph(Lexer* self, Graphviz* gv) {

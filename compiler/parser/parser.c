@@ -203,7 +203,7 @@ static bool Parser_parseConstDecls(Parser* self, AST_ConstDecls** const_decls) {
 			release(&consts);
 			return false;
 		}
-		append(&consts->consts, newConst);
+		array_append(&consts->consts, newConst);
 	} while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == commasym);
 	
 	/* Consume ";" */
@@ -255,7 +255,7 @@ static bool Parser_parseVarDecls(Parser* self, AST_VarDecls** var_decls) {
 			release(&vars);
 			return false;
 		}
-		append(&vars->vars, var);
+		array_append(&vars->vars, var);
 	} while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == commasym);
 	
 	/* Consume ";" */
@@ -296,7 +296,7 @@ static bool Parser_parseProcDecls(Parser* self, AST_ProcDecls** proc_decls) {
 			release(&procs);
 			return false;
 		}
-		append(&procs->procs, proc);
+		array_append(&procs->procs, proc);
 	}
 
 	*proc_decls = procs;
@@ -391,7 +391,7 @@ static bool Parser_parseParamDecls(Parser* self, AST_ParamDecls** param_decls) {
 			release(&params);
 			return false;
 		}
-		append(&params->params, param);
+		array_append(&params->params, param);
 		
 		/* Keep going as long as we have another parameter to parse */
 		while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == commasym) {
@@ -406,7 +406,7 @@ static bool Parser_parseParamDecls(Parser* self, AST_ParamDecls** param_decls) {
 				release(&params);
 				return false;
 			}
-			append(&params->params, param);
+			array_append(&params->params, param);
 		}
 	}
 	
@@ -821,7 +821,7 @@ static bool Parser_parseParamList(Parser* self, AST_ParamList** param_list) {
 			release(&paramList);
 			return false;
 		}
-		append(&paramList->params, param);
+		array_append(&paramList->params, param);
 		
 		/* Keep going as long as we have another parameter to parse */
 		while(TokenStream_peekToken(self->token_stream, &tok) && tok->type == commasym) {
@@ -836,7 +836,7 @@ static bool Parser_parseParamList(Parser* self, AST_ParamList** param_list) {
 				release(&paramList);
 				return false;
 			}
-			append(&paramList->params, param);
+			array_append(&paramList->params, param);
 		}
 	}
 	

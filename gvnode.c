@@ -16,7 +16,7 @@ Destroyer(GVNode) {
 		destroy(&attr->name);
 		destroy(&attr->value);
 	}
-	clear_array(&self->attrs);
+	array_clear(&self->attrs);
 }
 DEF(GVNode);
 
@@ -27,9 +27,9 @@ GVNode* GVNode_initWithIdentifier(GVNode* self, const char* identifier, ...) {
 }
 GVNode* GVNode_vInitWithIdentifier(GVNode* self, const char* identifier, va_list ap) {
 	if((self = GVNode_init(self))) {
-		char* escaped = html_str(identifier);
-		vasprintf_ff(&self->node_id, escaped, ap);
-		destroy(&escaped);
+		char* unescaped = vrsprintf_ff(identifier, ap);
+		self->node_id = html_str(unescaped);
+		destroy(&unescaped);
 	}
 	
 	return self;
@@ -53,7 +53,7 @@ void GVNode_vAddAttribute(GVNode* self, const char* attrib, const char* value, v
 	element_type(self->attrs) attr;
 	attr.name = html_str(attrib);
 	attr.value = vrsprintf_ff(value, ap);
-	append(&self->attrs, attr);
+	array_append(&self->attrs, attr);
 }
 
 void GVNode_draw(GVNode* self, Graphviz* gv) {
@@ -63,18 +63,17 @@ void GVNode_draw(GVNode* self, Graphviz* gv) {
 		return;
 	}
 	
-	char* attrs = NULL;
+	dynamic_string attrs = {};
 	foreach(&self->attrs, attr) {
-		const char* prefix = "";
-		if(attrs != NULL) {
-			prefix = ", ";
+		if(!string_empty(&attrs)) {
+			string_append(&attrs, ", ");
 		}
 		
-		char* next = rsprintf_ff("%s%s%s=%s", attrs ?: "", prefix, attr->name, attr->value);
-		destroy(&attrs);
-		attrs = next;
+		string_append(&attrs, attr->name);
+		string_appendChar(&attrs, '=');
+		string_append(&attrs, attr->value);
 	}
 	
-	Graphviz_draw(gv, "<%s> [%s];", self->node_id, attrs);
-	destroy(&attrs);
+	Graphviz_draw(gv, "<%s> [%s];", self->node_id, string_cstr(&attrs));
+	string_clear(&attrs);
 }

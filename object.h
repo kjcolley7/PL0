@@ -10,6 +10,8 @@
 #define PL0_OBJECT_H
 
 #include "macros.h"
+#include "dynamic_array.h"
+#include "dynamic_string.h"
 
 /*! Adds the struct element for the object base */
 #define OBJECT_BASE ObjBase _base
@@ -116,16 +118,25 @@ static inline void* _retain(ObjBase* base) {
 	return base;
 }
 
-/*! Release a reference to an object (and destroy it when reference count reaches zero)
- * @note This sets the pointed to variable to NULL to prevent use after free bugs
+/*! Release a reference to an object, destroying the object when its reference count reaches zero
+ * @note This sets the pointed to variable to NULL to help avoid simple use after free bugs
  */
 #define release(pobj) do { \
 	__typeof__(pobj) _pobj = (pobj); \
-	if(!_pobj || !*_pobj) { \
+	if(!_pobj) { \
 		break; \
 	} \
-	_release(&(*_pobj)->_base); \
+	release_local(*_pobj); \
 	*_pobj = NULL; \
+} while(0)
+
+/*! Release a reference to an object, destroying the object when its reference count reaches zero */
+#define release_local(obj) do { \
+	__typeof__(obj) _obj = (obj); \
+	if(!_obj) { \
+		break; \
+	} \
+	_release(&_obj->_base); \
 } while(0)
 static inline void _release(ObjBase* base) {
 	/* This shouldn't ever happen */
@@ -150,6 +161,15 @@ static inline void _release(ObjBase* base) {
 		}
 	}
 }
+
+/*! Helper macro to release all elements in a dynamic array and then destroy the array */
+#define array_release(parr) do { \
+	__typeof__(parr) _array_release_parr = (parr); \
+	foreach(_array_release_parr, _array_release_pcur) { \
+		release(_array_release_pcur); \
+	} \
+	array_clear(_array_release_parr); \
+} while(0)
 
 
 #endif /* PL0_OBJECT_H */

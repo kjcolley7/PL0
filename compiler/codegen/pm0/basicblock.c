@@ -18,9 +18,9 @@ static void BasicBlock_appendLine(char** label, const char* line);
 
 Destroyer(BasicBlock) {
 	release(&self->next);
-	clear_array(&self->insns);
-	clear_array(&self->symrefs);
-	clear_array(&self->coderefs);
+	array_clear(&self->insns);
+	array_clear(&self->symrefs);
+	array_clear(&self->coderefs);
 }
 
 DEF_CUSTOM(BasicBlock) {
@@ -57,7 +57,7 @@ void BasicBlock_markSymbol(BasicBlock* self, Symbol* sym) {
 		.sym = sym,
 		.index = (Word)self->insns.count
 	};
-	append(&self->symrefs, symref);
+	array_append(&self->symrefs, symref);
 }
 
 static void BasicBlock_invalidateTail(BasicBlock* self) {
@@ -123,7 +123,7 @@ void BasicBlock_addXref(BasicBlock* self, BasicBlock* from) {
 	}
 	
 	/* Append xref */
-	append(&self->coderefs, from);
+	array_append(&self->coderefs, from);
 }
 
 void BasicBlock_removeXref(BasicBlock* self, BasicBlock* from) {
@@ -135,7 +135,7 @@ void BasicBlock_removeXref(BasicBlock* self, BasicBlock* from) {
 	foreach(&self->coderefs, pxref) {
 		if(*pxref == from) {
 			/* Remove the reference */
-			remove_element(&self->coderefs, pxref);
+			array_removeElement(&self->coderefs, pxref);
 			break;
 		}
 	}
@@ -163,7 +163,7 @@ void BasicBlock_removeXref(BasicBlock* self, BasicBlock* from) {
 
 void BasicBlock_addInsn(BasicBlock* self, Insn insn) {
 	/* Add the instruction and invalidate the tail */
-	append(&self->insns, insn);
+	array_append(&self->insns, insn);
 	BasicBlock_invalidateTail(self);
 }
 
@@ -217,13 +217,13 @@ void BasicBlock_resolve(BasicBlock* self, Block* scope) {
 
 static void BasicBlock_removeInsn(BasicBlock* self, size_t index) {
 	/* Remove the instruction from the instructions array */
-	remove_index(&self->insns, index);
+	array_removeIndex(&self->insns, index);
 	
 	/* Look for a symbol that references the deleted instruction */
 	enumerate(&self->symrefs, i, symref) {
 		if(symref->index == index) {
 			/* Remove symbol from symbol array */
-			remove_index(&self->symrefs, i--);
+			array_removeIndex(&self->symrefs, i--);
 		}
 		else if(symref->index > index) {
 			/* Decrement each index after the removed element */
@@ -290,7 +290,7 @@ void BasicBlock_optimize(BasicBlock* self) {
 	}
 }
 
-#define ADD_INSN(insn) append(&self->insns, insn)
+#define ADD_INSN(insn) array_append(&self->insns, insn)
 static void BasicBlock_genTail(BasicBlock* self, uint16_t level) {
 	/* If this basic block already has a tail, do nothing */
 	if(self->flags & BB_HAS_TAIL) {

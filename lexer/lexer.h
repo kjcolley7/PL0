@@ -34,7 +34,7 @@ struct Lexer {
 	State* fsm;
 	
 	/*! Character buffer for the lexeme of the current token */
-	dynamic_array(char) lexeme;
+	dynamic_string lexeme;
 	
 	/*! Current line number (aids in debugging) */
 	int line_number;

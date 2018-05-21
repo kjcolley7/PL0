@@ -34,8 +34,8 @@ static int compare_sym(const void* a, const void* b);
 
 
 Destroyer(SymTree) {
-	release_array(&self->children);
-	release_array(&self->syms);
+	array_release(&self->children);
+	array_release(&self->syms);
 }
 DEF(SymTree);
 
@@ -224,7 +224,7 @@ bool SymTree_addSymbol(SymTree* self, Symbol* sym) {
 	
 	/* Insert the symbol into its position */
 	retain(sym);
-	insert_element(&self->syms, lo, &sym);
+	array_insert(&self->syms, lo, &sym);
 	return true;
 }
 
@@ -234,7 +234,7 @@ void SymTree_addChild(SymTree* self, SymTree* child) {
 	}
 	
 	/* Add the child into the array of children */
-	append(&self->children, child);
+	array_append(&self->children, child);
 	
 	/* Give the child a pointer to its parent */
 	child->parent = self;
