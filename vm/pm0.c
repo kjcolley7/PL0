@@ -32,8 +32,7 @@ int run_vm(VMFiles* files, bool markdown, bool debug) {
 	}
 	
 	/* Load the code from the specified file into code memory (and disassemble it) */
-	int err = Machine_loadCode(cpu, files->mcode);
-	if(err != 0) {
+	if(!Machine_loadCode(cpu, files->mcode)) {
 		release(&cpu);
 		return EXIT_FAILURE;
 	}
@@ -45,17 +44,18 @@ int run_vm(VMFiles* files, bool markdown, bool debug) {
 	/* Enable logging to the stacktrace file */
 	Machine_setLogFile(cpu, files->stacktrace);
 	
+	bool success;
 	if(debug) {
 		/* Create and run the debugger */
 		DebugEngine* dbg = DebugEngine_initWithCPU(DebugEngine_alloc(), cpu);
-		err = DebugEngine_run(dbg);
+		success = DebugEngine_run(dbg);
 	}
 	else {
 		/* Begin execution */
-		err = Machine_run(cpu);
+		success = Machine_run(cpu);
 	}
 	
 	/* Clean up resources and exit */
 	release(&cpu);
-	return err;
+	return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }

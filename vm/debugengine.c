@@ -150,6 +150,7 @@ DEF(DebugEngine);
 DebugEngine* DebugEngine_initWithCPU(DebugEngine* self, Machine* cpu) {
 	if((self = DebugEngine_init(self))) {
 		self->cpu = retain(cpu);
+		self->cpu->debugFlags |= DEBUG_ACTIVE;
 	}
 	
 	return self;

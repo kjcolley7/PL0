@@ -14,6 +14,7 @@
 
 typedef enum CPUStatus CPUStatus;
 typedef struct CPUState CPUState;
+typedef enum CPUDebugFlags CPUDebugFlags;
 typedef struct Breakpoint Breakpoint;
 typedef struct Machine Machine;
 
@@ -36,6 +37,18 @@ struct CPUState {
 	Word sp;
 	Insn ir;
 	Word pc;
+};
+
+/*! Debugging flags used by the CPU */
+enum CPUDebugFlags {
+	/*! Whether the CPU is running under a debugger */
+	DEBUG_ACTIVE   = (1 << 0),
+	
+	/*! Whether we should skip the next instruction if it's a breakpoint */
+	DEBUG_RESUMING = (1 << 1),
+	
+	/*! Whether we are single stepping and should stop after the next instruction */
+	DEBUG_STEPPING = (1 << 2)
 };
 
 /*! The data associated with a breakpoint */
@@ -91,11 +104,11 @@ struct Machine {
 	/*! Array of breakpoints set */
 	dynamic_array(Breakpoint) bps;
 	
-	/*! Whether we should skip the next instruction if it's a breakpoint */
-	bool isResuming;
+	/*! CPU debugging flags */
+	CPUDebugFlags debugFlags;
 	
-	/*! Whether we are single stepping and should stop after the next instruction */
-	bool isStepping;
+	/*! Input stream buffer */
+	dynamic_string input_buffer;
 };
 DECL(Machine);
 
@@ -120,9 +133,9 @@ void Machine_setLogFile(Machine* self, FILE* flog);
 
 /*! Loads a machine code program from the specified file
  @param fp Input file to load code from
- @return Zero on success, or -1 on error
+ @return True on success, or false on error
  */
-int Machine_loadCode(Machine* self, FILE* fp);
+bool Machine_loadCode(Machine* self, FILE* fp);
 
 /*! Writes the disassembled code in table format to the given file
  @param fp Output file stream to pring the disassembly table
@@ -133,9 +146,9 @@ void Machine_printDisassembly(Machine* self, FILE* fp);
 void Machine_start(Machine* self);
 
 /*! Begin execution of the machine until the program halts (or an exception occurs)
- @return Zero on success, or nonzero on error
+ @return True on success, or false on error
  */
-int Machine_run(Machine* self);
+bool Machine_run(Machine* self);
 
 /*! Resume execution after a breakpoint */
 CPUStatus Machine_continue(Machine* self);

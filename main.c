@@ -48,6 +48,7 @@ static const char* const stacktrace_txt = "stacktrace.txt";
 #define OPT_SKIP_RUN      (1<<6)
 #define OPT_SKIP_COMPILE  (1<<7)
 #define OPT_DEBUGGER      (1<<8)
+#define OPT_NO_STACKTRACE (1<<9)
 
 
 int main(int argc, char* argv[]) {
@@ -88,6 +89,9 @@ int main(int argc, char* argv[]) {
 		}
 		ARG('d', "debug", "Run program in the PM/0 debugger") {
 			opts |= OPT_DEBUGGER;
+		}
+		ARG('n', "no-stacktrace", "Don't write stacktrace while running (MUCH FASTER!)") {
+			opts |= OPT_NO_STACKTRACE;
 		}
 		ARG(0, "parser=rdp", "Use the recursive descent parser (default)") {
 			parserType = PARSER_RDP;
@@ -183,7 +187,9 @@ int main(int argc, char* argv[]) {
 			/* Duplicate the disassembled code file to stdout */
 			vmFiles->acode = ftee(vmFiles->acode, stdout);
 		}
-		vmFiles->stacktrace = fopen_ff(stacktrace_txt, "w");
+		if(!(opts & OPT_NO_STACKTRACE)) {
+			vmFiles->stacktrace = fopen_ff(stacktrace_txt, "w");
+		}
 		if(opts & OPT_TEE_TRACE) {
 			/* Duplicate the stacktrace file to stdout */
 			vmFiles->stacktrace = ftee(vmFiles->stacktrace, stdout);
