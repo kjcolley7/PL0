@@ -13,6 +13,7 @@
 static void BasicBlock_invalidateTail(BasicBlock* self);
 static void BasicBlock_removeInsn(BasicBlock* self, size_t index);
 static void BasicBlock_genTail(BasicBlock* self, uint16_t level);
+static void BasicBlock_tailCallOptimize(BasicBlock* self, Block* scope);
 static void BasicBlock_appendLine(char** label, const char* line);
 
 
@@ -203,8 +204,12 @@ void BasicBlock_resolve(BasicBlock* self, Block* scope) {
 					addr = Block_getAddress(blk);
 				}
 				
-				/* Set the target address and relative level of this CAL instruction */
-				pinsn->lvl = scope->symtree->level - sym->level;
+				/* If this is a CAL instruction, set the relative level */
+				if(pinsn->op == OP_CAL) {
+					pinsn->lvl = scope->symtree->level - sym->level;
+				}
+				
+				/* Set the target address of this CAL/JMP instruction */
 				pinsn->imm = addr;
 				break;
 			}
@@ -242,7 +247,7 @@ static void BasicBlock_removeInsn(BasicBlock* self, size_t index) {
 	}
 }
 
-void BasicBlock_optimize(BasicBlock* self) {
+void BasicBlock_optimize(BasicBlock* self, Block* scope) {
 	/* Need to rebuild the tail after any optimizations */
 	BasicBlock_invalidateTail(self);
 	
@@ -288,12 +293,15 @@ void BasicBlock_optimize(BasicBlock* self) {
 		}
 #endif
 	}
+	
+	/* Try to perform tail call optimization */
+	BasicBlock_tailCallOptimize(self, scope);
 }
 
 #define ADD_INSN(insn) array_append(&self->insns, insn)
 static void BasicBlock_genTail(BasicBlock* self, uint16_t level) {
-	/* If this basic block already has a tail, do nothing */
-	if(self->flags & BB_HAS_TAIL) {
+	/* If this basic block already has a tail or has been tail call optimized, do nothing */
+	if(HAS_ANY_FLAGS(self->flags, BB_HAS_TAIL | BB_TAIL_CALL_OPTIMIZED)) {
 		return;
 	}
 	
@@ -388,6 +396,178 @@ static void BasicBlock_genTail(BasicBlock* self, uint16_t level) {
 	}
 }
 #undef ADD_INSN
+
+static void BasicBlock_tailCallOptimize(BasicBlock* self, Block* scope) {
+	/* Check whether this basic block has already been tail call optimized */
+	if(self->flags & BB_TAIL_CALL_OPTIMIZED) {
+		return;
+	}
+	
+	/* Only operate on terminating basic blocks */
+	if(self->insns.count < 1) {
+		return;
+	}
+	
+	bool isTailCall = false;
+	Insn callInsn = MAKE_BREAK(-1);
+	size_t callIndex = 0;
+	
+	/* Two cases of tail calls to consider */
+	Insn lastInsn = self->insns.elems[self->insns.count - 1];
+	if(lastInsn.op == OP_CAL) {
+		/* Case 1: Tail call without assigning result to `return`
+		 *
+		 * Example assembly listing:
+		 *
+		 * CAL someProc
+		 * RET
+		 */
+		isTailCall = true;
+		callInsn = lastInsn;
+		callIndex = self->insns.count - 1;
+	}
+	else if(self->insns.count >= 3) {
+		/* Case 2: Tail call that assigns result to `return`.
+		 *
+		 * Example assembly listing:
+		 *
+		 * CAL someProc
+		 * INC 1
+		 * STO return
+		 * RET
+		 */
+		
+		Insn stoReturn = MAKE_STO(0, 0);
+		Insn inc1 = MAKE_INC(1);
+		Insn secondToLastInsn = self->insns.elems[self->insns.count - 2];
+		Insn thirdFromLastInsn = self->insns.elems[self->insns.count - 3];
+		
+		bool lastInsnIsStoReturn = memcmp(&lastInsn, &stoReturn, sizeof(stoReturn)) == 0;
+		bool secondToLastInsnIsInc1 = memcmp(&secondToLastInsn, &inc1, sizeof(inc1)) == 0;
+		bool thirdFromLastInsnIsCall = thirdFromLastInsn.op == OP_CAL;
+		if(lastInsnIsStoReturn && secondToLastInsnIsInc1 && thirdFromLastInsnIsCall) {
+			isTailCall = true;
+			callInsn = thirdFromLastInsn;
+			callIndex = self->insns.count - 3;
+		}
+	}
+	
+	if(!isTailCall) {
+		return;
+	}
+	
+	/* STACK FRAME:
+	 *
+	 * BP+?: SCRATCH SPACE
+	 * BP+N: VARS
+	 * BP+4: PARAMS
+	 * BP+3: RETURN ADDRESS
+	 * BP+2: DYNAMIC LINK
+	 * BP+1: STATIC LINK
+	 * BP+0: RETURN VALUE
+	 *
+	 * Before TCO:
+	 *
+	 * INC 4
+	 * LIT 1
+	 * LIT ...
+	 * LIT someProc.paramCount
+	 * INC -(4 + someProc.paramCount)
+	 * CAL someProc
+	 * INC 1
+	 * STO return
+	 * RET
+	 *
+	 * After TCO:
+	 *
+	 * LIT 1
+	 * LIT ...
+	 * LIT someProc.paramCount
+	 * INC -(thisProc.frameSize + someProc.paramCount) + 1 #adjust stack to static link location
+	 * LOD (origCal.L-1) 1 #load static link
+	 * INC 2 #leave dynamic link and return address unchanged
+	 * LOD 0 (thisProc.frameSize + 0)
+	 * LOD 0 (thisProc.frameSize + ...)
+	 * LOD 0 (thisProc.frameSize + someProc.paramCount - 1)
+	 * INC -(4 + someProc.paramCount)
+	 * JMP someProc
+	 */
+	
+	/* Compute frame size at the point of the tail call */
+	Word paramCount = -1;
+	Symbol* callee = NULL;
+	foreach(&self->symrefs, xref) {
+		if(xref->index == callIndex && xref->sym->type == SYM_PROC) {
+			paramCount = (Word)xref->sym->value.procedure.param_count;
+			callee = xref->sym;
+		}
+	}
+	
+	/* Couldn't find a symbol reference? */
+	if(callee == NULL) {
+		return;
+	}
+	
+	/* Cannot perform TCO when calling a child procedure */
+	Word callLevel = scope->symtree->level - callee->value.procedure.body->symtree->level;
+	if(callLevel < 0) {
+		return;
+	}
+	
+	/* Load containing procedure's frame size */
+	Word frameSize = scope->symtree->frame_size;
+	
+	/* Trim call instruction (and store to return if exists) */
+	while(self->insns.count > callIndex) {
+		BasicBlock_removeInsn(self, self->insns.count - 1);
+	}
+	
+	/* Trim additional INC -(4 + someProc.paramCount) if exists */
+	Insn incBeforeCall = MAKE_INC(-(4 + paramCount));
+	Word stackOffset = 0;
+	if(memcmp(&self->insns.elems[self->insns.count - 1], &incBeforeCall, sizeof(incBeforeCall)) == 0) {
+		BasicBlock_removeInsn(self, self->insns.count - 1);
+		stackOffset = 4 + paramCount;
+	}
+	
+	/* INC 1 - thisProc.frameSize - stackOffset #adjust stack to static link location */
+	Insn destroyCurrentFrame = MAKE_INC(1 - (frameSize + stackOffset));
+	BasicBlock_addInsn(self, destroyCurrentFrame);
+	
+	/* LOD (origCal.L-1) 1 #load static link */
+	Insn loadStaticLink = MAKE_LOD(callLevel, 1);
+	BasicBlock_addInsn(self, loadStaticLink);
+	
+	if(paramCount > 0) {
+		/* INC 2 #leave dynamic link and return address unchanged */
+		Insn inc2 = MAKE_INC(2);
+		BasicBlock_addInsn(self, inc2);
+		
+		Word i;
+		for(i = 0; i < paramCount; i++) {
+			/* LOD 0 (thisProc.frameSize + 4 + i) */
+			Insn loadParam = MAKE_LOD(0, frameSize + 4 + i);
+			BasicBlock_addInsn(self, loadParam);
+		}
+		
+		/* INC -(4 + someProc.paramCount) */
+		Insn leaveFrame = MAKE_INC(-(4 + paramCount));
+		BasicBlock_addInsn(self, leaveFrame);
+	}
+	else {
+		/* INC -2 */
+		Insn incNeg2 = MAKE_INC(-2);
+		BasicBlock_addInsn(self, incNeg2);
+	}
+	
+	/* JMP someProc */
+	BasicBlock_markSymbol(self, callee);
+	Insn jmpProc = MAKE_JMP(callInsn.imm);
+	BasicBlock_addInsn(self, jmpProc);
+	
+	/* Mark this basic block as having been tail call optimized */
+	self->flags |= BB_TAIL_CALL_OPTIMIZED;
+}
 
 void BasicBlock_emit(BasicBlock* self, FILE* fp, uint16_t level) {
 	ASSERT(self->code_addr != ADDR_UND);

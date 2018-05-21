@@ -15,9 +15,10 @@
 
 typedef struct BasicBlock BasicBlock;
 typedef uint8_t BBFlags;
-const static BBFlags BB_HAS_CONDITION     = 1<<0;
-const static BBFlags BB_HAS_TAIL          = 1<<1;
-const static BBFlags BB_INVERT_CONDITION  = 1<<2;
+const static BBFlags BB_HAS_CONDITION       = 1<<0;
+const static BBFlags BB_HAS_TAIL            = 1<<1;
+const static BBFlags BB_INVERT_CONDITION    = 1<<2;
+const static BBFlags BB_TAIL_CALL_OPTIMIZED = 1<<3;
 
 #include "object.h"
 #include "config.h"
@@ -133,8 +134,10 @@ void BasicBlock_setAddress(BasicBlock* self, Word addr);
  */
 void BasicBlock_resolve(BasicBlock* self, Block* scope);
 
-/*! Performs optimizations on a basic block */
-void BasicBlock_optimize(BasicBlock* self);
+/*! Performs optimizations on a basic block
+ @param scope Scope of the code this basic block was generated from
+ */
+void BasicBlock_optimize(BasicBlock* self, Block* scope);
 
 /*! Emits the instructions in this basic block to the output file stream specified
  @param fp File stream to write PM/0 machine code to

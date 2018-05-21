@@ -67,7 +67,7 @@ void Block_optimize(Block* self) {
 		BasicBlock* prev = cur->prev;
 		
 		/* Optimize referenced blocks (this might destroy cur!) */
-		BasicBlock_optimize(cur);
+		BasicBlock_optimize(cur, self);
 		cur = prev;
 	}
 }
