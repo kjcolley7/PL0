@@ -143,20 +143,20 @@ static void DebugEngine_doHelp(DebugEngine* self, Command* cmd);
 
 
 Destroyer(DebugEngine) {
-	/* Nothing to destroy */
+	release(&self->cpu);
 };
 DEF(DebugEngine);
 
 DebugEngine* DebugEngine_initWithCPU(DebugEngine* self, Machine* cpu) {
 	if((self = DebugEngine_init(self))) {
-		self->cpu = cpu;
+		self->cpu = retain(cpu);
 	}
 	
 	return self;
 }
 
-int DebugEngine_run(DebugEngine* self) {
-	int err = 0;
+bool DebugEngine_run(DebugEngine* self) {
+	bool success = true;
 	char line[1024];
 	bool keepGoing = true;
 	const char* prompt = "\r(dbg) ";
@@ -166,9 +166,21 @@ int DebugEngine_run(DebugEngine* self) {
 	
 	printf("\nPM/0 debugger\n");
 	printf("%s", prompt);
+	
+	Command* lastCmd = NULL;
 	while(keepGoing && fgets(line, sizeof(line), stdin)) {
-		/* Parse the command line */
-		Command* cmd = Command_initWithLine(Command_alloc(), line);
+		Command* cmd;
+		
+		/* If the line is empty, run the previous command again */
+		if(strchr(line, '\n') == line) {
+			cmd = lastCmd;
+		}
+		else {
+			/* Parse the command line */
+			cmd = Command_initWithLine(Command_alloc(), line);
+			lastCmd = cmd;
+		}
+		
 		if(!cmd) {
 			if(feof(stdin)) {
 				break;
@@ -199,7 +211,7 @@ int DebugEngine_run(DebugEngine* self) {
 			case STATUS_ERROR:
 				printf("\nState of the CPU when exception was thrown:\n");
 				Machine_printState(self->cpu, stdout);
-				err = EXIT_FAILURE;
+				success = false;
 				keepGoing = false;
 				break;
 			
@@ -212,7 +224,7 @@ int DebugEngine_run(DebugEngine* self) {
 	
 	/* If stdin is closed, remove breakpoints */
 	Machine_clearBreakpoints(self->cpu);
-	return err;
+	return success;
 }
 
 

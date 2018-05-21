@@ -9,6 +9,8 @@
 #ifndef PL0_DEBUGENGINE_H
 #define PL0_DEBUGENGINE_H
 
+#include <stdbool.h>
+
 typedef struct DebugEngine DebugEngine;
 
 #include "object.h"
@@ -29,9 +31,9 @@ DECL(DebugEngine);
 DebugEngine* DebugEngine_initWithCPU(DebugEngine* self, Machine* cpu);
 
 /*! Run the program through the debugger
- @return Zero on success, nonzero on error
+ @return True on success, or false on error
  */
-int DebugEngine_run(DebugEngine* self);
+bool DebugEngine_run(DebugEngine* self);
 
 
 #endif /* PL0_DEBUGENGINE_H */
