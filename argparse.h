@@ -50,24 +50,44 @@ for(int _argparse_once = 1; _argparse_once; _argparse_once = 0) \
 	for(struct argparse _argparse_info = {}; _argparse_once; _argparse_once = 0) \
 		for(int _argidx = 1, _arg = ARG_VALUE_INIT; \
 			_arg != ARG_VALUE_DONE; \
-			_arg = _argparse_parse(&_argparse_info, &_argidx, argc, argv))
+			_arg = _argparse_parse(&_argparse_info, &_argidx, argc, argv)) \
+			switch(_arg) \
+				case ARG_VALUE_INIT:
 
 #define MAKE_ARG_VALUE(value) ((value) | ARG_NORMAL_BIT)
 
-#define ARG(short_name, long_name, description) ARG_(__COUNTER__, short_name, long_name, description)
-#define ARG_(id, short_name, long_name, description) ARG__(id, short_name, long_name, description)
-#define ARG__(id, short_name, long_name, description) \
+#define ARG(short_name, long_name, description) UNIQUIFY(ARG_, short_name, long_name, description)
+#define ARG_(id, short_name, long_name, description) \
 if(_arg == ARG_VALUE_INIT) { \
 	_argparse_add(&_argparse_info, MAKE_ARG_VALUE(id), short_name, long_name, description); \
+	if(0) { \
+		_arg_break_##id: break; \
+	} \
 } \
-else if(_arg == MAKE_ARG_VALUE(id))
+else if(0) \
+	case MAKE_ARG_VALUE(id): \
+	for(int _arg_loop = 0; ; ++_arg_loop) \
+		if(_arg_loop == 1) { \
+			goto _arg_break_##id; \
+		} \
+		else
 
 #define ARG_OTHER(argname) \
-for(const char* argname = argv[_argidx-1]; argname != NULL; argname = NULL) \
-	if(_arg == ARG_VALUE_INIT) { \
-		_argparse_info.has_catchall = 1; \
+if(_arg == ARG_VALUE_INIT) { \
+	_argparse_info.has_catchall = 1; \
+	if(0) { \
+		_arg_break_other: break; \
 	} \
-	else if(_arg == ARG_VALUE_OTHER)
+} \
+else if(0) \
+	case ARG_VALUE_OTHER: \
+	default: \
+	for(int _arg_loop = 0; ; ++_arg_loop) \
+		if(_arg_loop == 1) { \
+			goto _arg_break_other; \
+		} \
+		else \
+			for(const char* argname = argv[_argidx-1]; argname != NULL; argname = NULL) \
 
 #define USAGE() _argparse_usage(&_argparse_info, argv[0])
 
@@ -120,8 +140,7 @@ static inline int _argparse_parse(struct argparse* argparse_info, int* argidx, i
 	
 	/* Did we parse all of the arguments? */
 	if(*argidx == argc) {
-		ret = ARG_VALUE_DONE;
-		goto out;
+		return ARG_VALUE_DONE;
 	}
 	
 	const char* arg = argv[(*argidx)++];
@@ -168,7 +187,7 @@ out:
 			return ret;
 		}
 		else {
-			printf("Unknown argument: %s\n", argv[*argidx]);
+			printf("Unknown argument: %s\n", arg);
 			return ARG_VALUE_ERROR;
 		}
 	}
