@@ -72,11 +72,12 @@ else if(0) \
 		} \
 		else
 
-#define ARG_OTHER(argname) \
+#define ARG_OTHER(argname) UNIQUIFY(ARG_OTHER_, argname)
+#define ARG_OTHER_(id, argname) \
 if(_arg == ARG_VALUE_INIT) { \
 	_argparse_info.has_catchall = 1; \
 	if(0) { \
-		_arg_break_other: break; \
+		_arg_break_##id: break; \
 	} \
 } \
 else if(0) \
@@ -84,7 +85,7 @@ else if(0) \
 	default: \
 	for(int _arg_loop = 0; ; ++_arg_loop) \
 		if(_arg_loop == 1) { \
-			goto _arg_break_other; \
+			goto _arg_break_##id; \
 		} \
 		else \
 			for(const char* argname = argv[_argidx-1]; argname != NULL; argname = NULL) \
