@@ -47,10 +47,10 @@ static int argtest(int argc, char* argv[]) {
 
 #define ARGPARSE(argc, argv) \
 for(int _argparse_once = 1; _argparse_once; _argparse_once = 0) \
-	for(struct argparse _argparse_info = {}; _argparse_once; _argparse_once = 0) \
+	for(struct argparse _argparse_info = {.orig_argc = (argc), .orig_argv = (argv)}; _argparse_once; _argparse_once = 0) \
 		for(int _argidx = 1, _arg = ARG_VALUE_INIT; \
 			_arg != ARG_VALUE_DONE; \
-			_arg = _argparse_parse(&_argparse_info, &_argidx, argc, argv)) \
+			_arg = _argparse_parse(&_argparse_info, &_argidx)) \
 			switch(_arg) \
 				case ARG_VALUE_INIT:
 
@@ -88,9 +88,9 @@ else if(0) \
 			goto _arg_break_##id; \
 		} \
 		else \
-			for(const char* argname = argv[_argidx-1]; argname != NULL; argname = NULL) \
+			for(const char* argname = argparse_info->orig_argv[_argidx-1]; argname != NULL; argname = NULL) \
 
-#define USAGE() _argparse_usage(&_argparse_info, argv[0])
+#define USAGE() _argparse_usage(&_argparse_info)
 
 
 #define LONG_ARG_MAX_WIDTH 30
@@ -102,6 +102,8 @@ else if(0) \
 
 
 struct argparse {
+	int orig_argc;
+	char** orig_argv;
 	dynamic_array(struct arg_info {
 		int arg_id;
 		char short_name;
@@ -136,15 +138,15 @@ static inline void _argparse_add(
 	}
 }
 
-static inline int _argparse_parse(struct argparse* argparse_info, int* argidx, int argc, char** argv) {
+static inline int _argparse_parse(struct argparse* argparse_info, int* argidx) {
 	int ret = ARG_VALUE_OTHER;
 	
 	/* Did we parse all of the arguments? */
-	if(*argidx == argc) {
+	if(*argidx == argparse_info->orig_argc) {
 		return ARG_VALUE_DONE;
 	}
 	
-	const char* arg = argv[(*argidx)++];
+	const char* arg = argparse_info->orig_argv[(*argidx)++];
 	if(arg[0] != '-') {
 		/* Argument doesn't start with a dash, so it's an "other" argument */
 		ret = ARG_VALUE_OTHER;
@@ -202,7 +204,7 @@ static inline int charcmp(const void* a, const void* b) {
 	return x - y;
 }
 
-static inline void _argparse_usage(struct argparse* argparse_info, const char* progname) {
+static inline void _argparse_usage(struct argparse* argparse_info) {
 	char shortOptions[256] = {};
 	size_t shortOptionCount = 0;
 	
@@ -215,7 +217,7 @@ static inline void _argparse_usage(struct argparse* argparse_info, const char* p
 	}
 	
 	/* Print usage header with program name */
-	printf("Usage: %s", progname);
+	printf("Usage: %s", argparse_info->orig_argv[0]);
 	
 	if(shortOptionCount > 0) {
 		/* Sort short option names by their ASCII values */
